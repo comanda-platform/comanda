@@ -1,13 +1,14 @@
 ![alt text](https://github.com/comanda-platform/comanda/blob/main/media/comanda-logo.svg?raw=true)
 # Comanda
-
+> Simple orders. Clear flow. From kitchen to customer.
+> 
 **Comanda** is an open-source restaurant management suite designed to streamline operations across kitchen, delivery, and admin workflows. Built with .NET 10, SignalR, and a CLEAN architecture, it handles orders, inventory, staff management, and real-time notifications.
 
 ---
 
-> **Comanda** is Spanish for order slip — the simple but crucial piece of paper that connects the kitchen, the delivery runner, and the person taking orders or payment.
->
-> This project is named **Comanda** because it focuses on that exact flow: capturing orders clearly, tracking them reliably, and coordinating everyone involved, from call-in order to delivery.
+**Comanda** is Spanish for order slip — the simple but crucial piece of paper that connects the kitchen, the delivery runner, and the person taking orders or payment.
+
+ This project got its name because it focuses on that exact flow: capturing orders clearly, tracking them reliably, and coordinating everyone involved, from call-in order to delivery.
 
 ---
 
