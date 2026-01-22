@@ -48,8 +48,6 @@
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
 - SQL Server or compatible database
-- Node.js (if building front-end clients)
-- Optional: Docker for containerized deployment
 
 ### Setup
 
