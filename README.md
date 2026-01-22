@@ -63,3 +63,11 @@ The project is named after this concept: a clear, reliable flow that keeps every
    ```bash
    git clone https://github.com/comanda-platform/comanda.git
    cd comanda
+
+## Author
+
+**Pål Rune Sørensen Tuv**  
+Senior Software Engineer / Systems Architect
+
+- GitHub: https://github.com/paaltuv  
+- LinkedIn: https://www.linkedin.com/in/p%C3%A5l-rune-s%C3%B8rensen-tuv-702412392/
