@@ -1,6 +1,6 @@
-# Comanda
-
 ![alt text](https://github.com/comanda-platform/comanda/blob/main/media/comanda-logo.svg?raw=true)
+
+# Comanda
 
 **Comanda** is an open-source restaurant management suite designed to streamline operations across kitchen, delivery, and admin workflows. Built with .NET 10, SignalR, and a CLEAN architecture, it handles orders, inventory, staff management, and real-time notifications.
 
