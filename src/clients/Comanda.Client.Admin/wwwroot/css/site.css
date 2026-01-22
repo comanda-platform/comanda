@@ -1,0 +1,65 @@
+/* Global styles */
+html, body {
+    font-family: 'Roboto', sans-serif;
+}
+
+app {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.page {
+    padding: 1rem;
+}
+
+/* Loading spinner */
+.loading-spinner {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+/* Status badges custom colors */
+.status-created {
+    background-color: #2196F3 !important;
+}
+
+.status-accepted {
+    background-color: #FF9800 !important;
+}
+
+.status-preparing {
+    background-color: #9C27B0 !important;
+}
+
+.status-ready {
+    background-color: #4CAF50 !important;
+}
+
+.status-intransit {
+    background-color: #00BCD4 !important;
+}
+
+.status-delivered {
+    background-color: #8BC34A !important;
+}
+
+.status-completed {
+    background-color: #607D8B !important;
+}
+
+.status-cancelled {
+    background-color: #F44336 !important;
+}
+
+
+
+
+
+
+
+
+
+

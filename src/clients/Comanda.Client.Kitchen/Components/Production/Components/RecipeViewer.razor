@@ -1,0 +1,117 @@
+@using Comanda.Client.Kitchen.Infrastructure.Localization
+@inject LocalizationService L
+
+@if (Recipe == null)
+{
+    <MudText Color="Color.Secondary">@L["NoRecipeAvailable"]</MudText>
+}
+else
+{
+    <MudStack Spacing="4">
+        @* Portions Section - simplified *@
+        <MudPaper Elevation="0" Class="pa-4" Style="background-color: var(--mud-palette-background);">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+                <MudNumericField @bind-Value="_portionOverride"
+                                 Label="@L["Portions"]"
+                                 Variant="Variant.Outlined"
+                                 Min="1"
+                                 Max="200"
+                                 Style="width: 200px;"
+                                 HideSpinButtons="false"
+                                 Adornment="Adornment.Start"
+                                 AdornmentIcon="@Icons.Material.Filled.Restaurant" />
+                
+@*                 @if (_portionOverride != Recipe.EstimatedPortions && Recipe.EstimatedPortions.HasValue)
+                {
+                    <MudChip T="string" Color="Color.Info" Size="Size.Small" Icon="@Icons.Material.Filled.Calculate">
+                        @L.GetString("ScaledFrom", Recipe.EstimatedPortions)
+                    </MudChip>
+                } *@
+            </MudStack>
+        </MudPaper>
+
+        @if (Recipe.Ingredients.Any())
+        {
+            <MudText Typo="Typo.subtitle1" Class="mb-2">
+                <MudIcon Icon="@Icons.Material.Filled.ShoppingBasket" Class="mr-1" />
+                @L["Ingredients"]
+            </MudText>
+
+            <MudSimpleTable Dense="true" Hover="true" Bordered="true">
+                <thead>
+                    <tr>
+                        <th>@L["Ingredient"]</th>
+                        <th style="text-align: right;">@L["Quantity"]</th>
+                        <th>@L["Unit"]</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var ingredient in Recipe.Ingredients)
+                    {
+                        var scaledQuantity = CalculateScaledQuantity(ingredient.Quantity);
+                        var isScaled = _portionOverride != Recipe.EstimatedPortions && Recipe.EstimatedPortions.HasValue;
+
+                        <tr>
+                            <td>@ingredient.InventoryItemName</td>
+                            <td style="text-align: right;">
+                                @if (isScaled)
+                                {
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.FlexEnd" Spacing="1">
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary" Style="text-decoration: line-through;">
+                                            @ingredient.Quantity.ToString("0.##")
+                                        </MudText>
+                                        <MudText Typo="Typo.body2" Color="Color.Info" Style="font-weight: bold;">
+                                            @scaledQuantity.ToString("0.##")
+                                        </MudText>
+                                    </MudStack>
+                                }
+                                else
+                                {
+                                    @ingredient.Quantity.ToString("0.##")
+                                }
+                            </td>
+                            <td>@ingredient.UnitCode</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info" Dense="true">
+                @L["NoIngredientsListed"]
+            </MudAlert>
+        }
+    </MudStack>
+}
+
+@code {
+    [Parameter, EditorRequired] public RecipeResponse? Recipe { get; set; }
+    
+    private int? _portionOverride;
+    
+    protected override void OnParametersSet()
+    {
+        // Initialize portion override with recipe's estimated portions
+        if (Recipe?.EstimatedPortions != null && _portionOverride == null)
+        {
+            _portionOverride = Recipe.EstimatedPortions;
+        }
+    }
+    
+    private decimal CalculateScaledQuantity(decimal originalQuantity)
+    {
+        if (Recipe?.EstimatedPortions == null || Recipe.EstimatedPortions == 0 || _portionOverride == null)
+            return originalQuantity;
+            
+        var scaleFactor = (decimal)_portionOverride.Value / Recipe.EstimatedPortions.Value;
+        return originalQuantity * scaleFactor;
+    }
+}
+
+
+
+
+
+
+

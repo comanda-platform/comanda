@@ -1,0 +1,76 @@
+@using Comanda.Shared.Enums
+
+<MudPaper Elevation="0" Class="pa-4">
+    <MudText Typo="Typo.h6" Class="mb-3">Order Workflow</MudText>
+    <MudStepper @ref="_stepper" ActiveIndex="@GetActiveStepIndex()" Linear="false" Color="Color.Primary" DisableAnimation="false">
+        <MudStep Title="Pending" Icon="@Icons.Material.Filled.HourglassEmpty">
+            <MudText>Order received and awaiting acceptance</MudText>
+        </MudStep>
+
+        <MudStep Title="Accepted" Icon="@Icons.Material.Filled.CheckCircle">
+            <MudText>Order accepted and ready to prepare</MudText>
+        </MudStep>
+
+        <MudStep Title="Preparing" Icon="@Icons.Material.Filled.Restaurant">
+            <MudText>Order is being prepared in the kitchen</MudText>
+        </MudStep>
+
+        <MudStep Title="Ready" Icon="@Icons.Material.Filled.Done">
+            <MudText>Order is ready for @(FulfillmentType == OrderFulfillmentType.Delivery ? "delivery" : "pickup")</MudText>
+        </MudStep>
+
+        @if (FulfillmentType == OrderFulfillmentType.Delivery)
+        {
+            <MudStep Title="In Transit" Icon="@Icons.Material.Filled.LocalShipping">
+                <MudText>Order is out for delivery</MudText>
+            </MudStep>
+        }
+
+        <MudStep Title="Delivered" Icon="@Icons.Material.Filled.ThumbUp">
+            <MudText>Order has been @(FulfillmentType == OrderFulfillmentType.Delivery ? "delivered" : "picked up")</MudText>
+        </MudStep>
+    </MudStepper>
+
+    @if (Status == OrderStatus.Cancelled)
+    {
+        <MudAlert Severity="Severity.Error" Class="mt-3">
+            <strong>Order Cancelled</strong> - This order was cancelled and will not proceed through the workflow.
+        </MudAlert>
+    }
+</MudPaper>
+
+@code {
+    [Parameter] public OrderStatus Status { get; set; }
+    [Parameter] public OrderFulfillmentType FulfillmentType { get; set; }
+
+    private MudStepper? _stepper;
+
+    private int GetActiveStepIndex()
+    {
+        if (Status == OrderStatus.Cancelled)
+            return -1;
+
+        var statusIndex = Status switch
+        {
+            OrderStatus.Created => 0,
+            OrderStatus.Accepted => 1,
+            OrderStatus.Preparing => 2,
+            OrderStatus.Ready => 3,
+            OrderStatus.InTransit => 4,
+            OrderStatus.Delivered => FulfillmentType == OrderFulfillmentType.Delivery ? 5 : 4,
+            _ => 0
+        };
+
+        return statusIndex;
+    }
+}
+
+
+
+
+
+
+
+
+
+

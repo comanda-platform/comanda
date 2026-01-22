@@ -1,0 +1,180 @@
+@page "/authorizations"
+@attribute [Authorize]
+@using Comanda.Client.Admin.Models
+@using Comanda.Shared.Enums
+
+<PageTitle>Authorizations - Comanda Admin</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Authorizations</MudText>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+}
+else
+{
+    <MudPaper Elevation="2" Class="pa-4">
+        <div class="d-flex justify-space-between align-center mb-4">
+            <MudText Typo="Typo.h6">@_authorizations.Count() Authorizations Found</MudText>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenCreateDialog">
+                New Authorization
+            </MudButton>
+        </div>
+
+        @if (_authorizations.Any())
+        {
+            <MudTable Items="@_authorizations"
+                      Hover="true"
+                      Breakpoint="Breakpoint.Sm"
+                      Dense="false"
+                      Loading="@_isLoading"
+                      LoadingProgressColor="Color.Primary">
+                <HeaderContent>
+                    <MudTh>Person</MudTh>
+                    <MudTh>Account</MudTh>
+                    <MudTh>Role</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Created</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Person">
+                        <MudText><strong>@context.PersonName</strong></MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@context.PersonPublicId</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Account">
+                        <MudText><strong>@context.AccountName</strong></MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@context.AccountPublicId</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Role">
+                        <MudChip T="string" Color="@GetRoleColor(context.Role)" Size="Size.Small">
+                            @context.Role
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Status">
+                        @if (context.IsActive)
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small">Active</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Default" Size="Size.Small">Inactive</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Created">
+                        @context.CreatedAt.ToString("MMM dd, yyyy")
+                    </MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Color="Color.Error"
+                                       Size="Size.Small"
+                                       OnClick="@(() => DeleteAuthorizationAsync(context.PublicId, context.PersonName, context.AccountName))" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info">
+                No authorizations found.
+            </MudAlert>
+        }
+    </MudPaper>
+}
+
+@code {
+    [Inject] private AuthorizationApiService AuthorizationApiService { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+    [Inject] private IDialogService DialogService { get; set; } = default!;
+
+    private bool _isLoading = true;
+    private List<AuthorizationResponse> _authorizations = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAuthorizationsAsync();
+    }
+
+    private async Task LoadAuthorizationsAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _authorizations = (await AuthorizationApiService.GetAuthorizationsAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading authorizations: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { "Title", "Create New Authorization" }
+        };
+
+        var dialog = await DialogService.ShowAsync<CreateAuthorizationDialog>("Create Authorization", parameters);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadAuthorizationsAsync();
+        }
+    }
+
+    private async Task DeleteAuthorizationAsync(string publicId, string personName, string accountName)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Message", $"Are you sure you want to delete authorization for '{personName}' on account '{accountName}'? This action cannot be undone." },
+            { "ConfirmText", "Delete" },
+            { "CancelText", "Cancel" },
+            { "ConfirmColor", Color.Error }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete Authorization", parameters);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            try
+            {
+                var success = await AuthorizationApiService.DeleteAuthorizationAsync(publicId);
+                if (success)
+                {
+                    Snackbar.Add("Authorization deleted successfully", Severity.Success);
+                    await LoadAuthorizationsAsync();
+                }
+                else
+                {
+                    Snackbar.Add("Failed to delete authorization", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting authorization: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private Color GetRoleColor(AuthorizationRole role)
+    {
+        return role switch
+        {
+            AuthorizationRole.Admin => Color.Error,
+            AuthorizationRole.Payer => Color.Primary,
+            AuthorizationRole.Orderer => Color.Info,
+            AuthorizationRole.Viewer => Color.Default,
+            _ => Color.Default
+        };
+    }
+}

@@ -1,0 +1,107 @@
+@using Comanda.Client.Kitchen.Infrastructure.Services
+@using Comanda.Client.Kitchen.Infrastructure.Localization
+@using Comanda.Shared.Enums
+@inject LocalizationService L
+
+@{
+    var borderColor = GetBorderColor(Line.PrepStatus);
+    var canShowControls = OrderStatus == OrderStatus.Preparing;
+}
+
+<MudPaper Elevation="0" Class="pa-2" Style="@($"border-left: 3px solid {borderColor}; background-color: var(--mud-palette-surface);")">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudText Typo="Typo.body1">
+                <strong>@Line.Quantity×</strong> @L["Item"] @Line.ProductPublicId[..8]
+            </MudText>
+            <StatusBadge PrepStatus="@Line.PrepStatus" />
+        </MudStack>
+
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+            @if (Line.PrepStartedAt.HasValue && Line.PrepStatus == OrderLinePrepStatus.InProgress)
+            {
+                <ElapsedTimer StartTime="@Line.PrepStartedAt.Value" Typo="Typo.caption" />
+            }
+
+            @if (canShowControls)
+            {
+                @switch (Line.PrepStatus)
+                {
+                    case OrderLinePrepStatus.Pending:
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Info"
+                                   Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.PlayArrow"
+                                   OnClick="@(() => OnStartPrep.InvokeAsync((OrderId: OrderPublicId, LineId: Line.LinePublicId)))">
+                            @L["Start"]
+                        </MudButton>
+                        break;
+
+                    case OrderLinePrepStatus.InProgress:
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Success"
+                                   Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.Dining"
+                                   OnClick="@(() => OnPlate.InvokeAsync((OrderId: OrderPublicId, LineId: Line.LinePublicId)))">
+                            @L["Plate"]
+                        </MudButton>
+                        break;
+
+                    case OrderLinePrepStatus.Plated:
+                        @if (Line.ContainerType != null)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Info">
+                                @Line.ContainerType
+                            </MudChip>
+                        }
+                        @if (Line.SelectedSides?.Any() == true)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Secondary">
+                                @string.Join(", ", Line.SelectedSides)
+                            </MudChip>
+                        }
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" />
+                        break;
+                }
+            }
+            else if (Line.PrepStatus == OrderLinePrepStatus.Plated)
+            {
+                @* Show plated status even before "Start Preparing" *@
+                @if (Line.ContainerType != null)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info">
+                        @Line.ContainerType
+                    </MudChip>
+                }
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" />
+            }
+        </MudStack>
+    </MudStack>
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public string OrderPublicId { get; set; } = default!;
+    [Parameter, EditorRequired] public OrderLineState Line { get; set; } = default!;
+    [Parameter] public OrderStatus OrderStatus { get; set; } = OrderStatus.Created;
+    [Parameter] public EventCallback<(string OrderId, string LineId)> OnStartPrep { get; set; }
+    [Parameter] public EventCallback<(string OrderId, string LineId)> OnPlate { get; set; }
+
+    private string GetBorderColor(OrderLinePrepStatus status)
+    {
+        return status switch
+        {
+            OrderLinePrepStatus.Pending => "var(--mud-palette-text-secondary)",
+            OrderLinePrepStatus.InProgress => "var(--mud-palette-warning)",
+            OrderLinePrepStatus.Plated => "var(--mud-palette-success)",
+            OrderLinePrepStatus.Completed => "var(--mud-palette-success)",
+            _ => "var(--mud-palette-text-secondary)"
+        };
+    }
+}
+
+
+
+
+
+
+

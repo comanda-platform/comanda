@@ -1,0 +1,69 @@
+@using Comanda.Client.Kitchen.Infrastructure.Services
+@using Comanda.Shared.Enums
+
+@{
+    var (color, icon, text) = GetBadgeInfo();
+}
+
+<MudChip T="string"
+         Color="@color"
+         Size="Size.Small"
+         Variant="Variant.Filled"
+         Icon="@icon">
+    @text
+</MudChip>
+
+@code {
+    [Parameter] public CookingStatus? CookingStatus { get; set; }
+    [Parameter] public OrderLinePrepStatus? PrepStatus { get; set; }
+    [Parameter] public OrderStatus? OrderStatus { get; set; }
+
+    private (Color color, string icon, string text) GetBadgeInfo()
+    {
+        if (CookingStatus.HasValue)
+        {
+            return CookingStatus.Value switch
+            {
+                Infrastructure.Services.CookingStatus.NotStarted => (Color.Default, Icons.Material.Filled.Schedule, "Not Started"),
+                Infrastructure.Services.CookingStatus.InProgress => (Color.Warning, Icons.Material.Filled.LocalFireDepartment, "Cooking"),
+                Infrastructure.Services.CookingStatus.Completed => (Color.Success, Icons.Material.Filled.CheckCircle, "Ready"),
+                _ => (Color.Default, Icons.Material.Filled.Help, "Unknown")
+            };
+        }
+
+        if (PrepStatus.HasValue)
+        {
+            return PrepStatus.Value switch
+            {
+                OrderLinePrepStatus.Pending => (Color.Default, Icons.Material.Filled.Schedule, "Pending"),
+                OrderLinePrepStatus.InProgress => (Color.Warning, Icons.Material.Filled.Restaurant, "Prepping"),
+                OrderLinePrepStatus.Plated => (Color.Info, Icons.Material.Filled.Dining, "Plated"),
+                OrderLinePrepStatus.Completed => (Color.Success, Icons.Material.Filled.CheckCircle, "Done"),
+                _ => (Color.Default, Icons.Material.Filled.Help, "Unknown")
+            };
+        }
+
+        if (OrderStatus.HasValue)
+        {
+            return OrderStatus.Value switch
+            {
+                Comanda.Shared.Enums.OrderStatus.Created => (Color.Default, Icons.Material.Filled.HourglassEmpty, "New"),
+                Comanda.Shared.Enums.OrderStatus.Accepted => (Color.Info, Icons.Material.Filled.ThumbUp, "Accepted"),
+                Comanda.Shared.Enums.OrderStatus.Preparing => (Color.Warning, Icons.Material.Filled.Restaurant, "Preparing"),
+                Comanda.Shared.Enums.OrderStatus.Ready => (Color.Success, Icons.Material.Filled.CheckCircle, "Ready"),
+                Comanda.Shared.Enums.OrderStatus.Delivered => (Color.Primary, Icons.Material.Filled.LocalShipping, "Delivered"),
+                Comanda.Shared.Enums.OrderStatus.Cancelled => (Color.Error, Icons.Material.Filled.Cancel, "Cancelled"),
+                _ => (Color.Default, Icons.Material.Filled.Help, "Unknown")
+            };
+        }
+
+        return (Color.Default, Icons.Material.Filled.Help, "Unknown");
+    }
+}
+
+
+
+
+
+
+

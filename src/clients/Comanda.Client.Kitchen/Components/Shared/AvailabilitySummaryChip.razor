@@ -1,0 +1,68 @@
+@implements IDisposable
+
+@if (_lowCount > 0)
+{
+    <MudChip T="string" 
+             Color="@GetChipColor()" 
+             Size="Size.Small" 
+             Variant="Variant.Filled"
+             Icon="@Icons.Material.Filled.Warning"
+             OnClick="NavigateToAvailability">
+        @_lowCount low/out
+    </MudChip>
+}
+
+@code {
+    [Inject] private AvailabilityStateService AvailabilityState { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+
+    private int _lowCount;
+
+    protected override void OnInitialized()
+    {
+        AvailabilityState.OnAvailabilityChanged += HandleAvailabilityChanged;
+        UpdateCount();
+    }
+
+    private void HandleAvailabilityChanged()
+    {
+        InvokeAsync(() =>
+        {
+            UpdateCount();
+            StateHasChanged();
+        });
+    }
+
+    private void UpdateCount()
+    {
+        _lowCount = AvailabilityState.GetLowAvailabilityCount();
+    }
+
+    private Color GetChipColor()
+    {
+        if (AvailabilityState.HasSoldOutItems())
+            return Color.Error;
+        
+        if (AvailabilityState.HasLowAvailabilityItems())
+            return Color.Warning;
+        
+        return Color.Success;
+    }
+
+    private void NavigateToAvailability()
+    {
+        Navigation.NavigateTo("/availability");
+    }
+
+    public void Dispose()
+    {
+        AvailabilityState.OnAvailabilityChanged -= HandleAvailabilityChanged;
+    }
+}
+
+
+
+
+
+
+

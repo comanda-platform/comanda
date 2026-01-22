@@ -1,0 +1,256 @@
+@inherits LayoutComponentBase
+@implements IAsyncDisposable
+@using Comanda.Client.Kitchen.Infrastructure.Localization
+@using Comanda.Client.Kitchen.Infrastructure.Notifications
+
+<MudThemeProvider Theme="_theme" IsDarkMode="true" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+@if (_isInitializing)
+{
+    <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="min-height: 100vh;">
+        <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+        <MudText Typo="Typo.subtitle1" Color="Color.Secondary">@Localization["Loading"]</MudText>
+    </MudStack>
+}
+else if (!_isAuthenticated)
+{
+    @Body
+}
+else
+{
+    <MudLayout>
+        <MudAppBar Elevation="1" Dense="true">
+            <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"
+                           OnClick="ToggleDrawer" />
+            <MudText Typo="Typo.h6">@Localization["Kitchen"]</MudText>
+            <MudSpacer />
+
+            <AvailabilitySummaryChip />
+
+            <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit"
+                     AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                <MudStack Class="pa-3" Spacing="2" Style="min-width: 200px;">
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.body2">@_username</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@_email</MudText>
+                    </MudStack>
+                    <MudDivider />
+                    <MudStack Spacing="1">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@Localization["Language"]</MudText>
+                        <MudButtonGroup OverrideStyles="false" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined">
+                            <MudButton Variant="@(Localization.CurrentLanguage == "en" ? Variant.Filled : Variant.Outlined)"
+                                       OnClick="@(() => HandleLanguageChanged("en"))"
+                                       Style="font-size: 1.5rem; min-width: 48px;">
+                                🇺🇸
+                            </MudButton>
+                            <MudButton Variant="@(Localization.CurrentLanguage == "es" ? Variant.Filled : Variant.Outlined)"
+                                       OnClick="@(() => HandleLanguageChanged("es"))"
+                                       Style="font-size: 1.5rem; min-width: 48px;">
+                                🇪🇸
+                            </MudButton>
+                        </MudButtonGroup>
+                    </MudStack>
+                    <MudDivider />
+                    <MudButton StartIcon="@Icons.Material.Filled.Logout"
+                               Variant="Variant.Text"
+                               Color="Color.Default"
+                               OnClick="HandleLogout"
+                               FullWidth="true"
+                               Style="justify-content: flex-start;">
+                        @Localization["SignOut"]
+                    </MudButton>
+                </MudStack>
+            </MudMenu>
+        </MudAppBar>
+
+        <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+            <MudNavMenu>
+                <MudNavLink Href="/" Match="NavLinkMatch.All"
+                            Icon="@Icons.Material.Filled.Home">
+                    @Localization["Home"]
+                </MudNavLink>
+                <MudNavLink Href="/production" Match="NavLinkMatch.Prefix"
+                            Icon="@Icons.Material.Filled.LocalFireDepartment">
+                    @Localization["Production"]
+                </MudNavLink>
+                <MudNavLink Href="/fulfillment" Match="NavLinkMatch.Prefix"
+                            Icon="@Icons.Material.Filled.RoomService">
+                    @Localization["Fulfillment"]
+                </MudNavLink>
+            </MudNavMenu>
+        </MudDrawer>
+
+        <MudMainContent Class="pa-4">
+            @Body
+        </MudMainContent>
+    </MudLayout>
+}
+
+@code {
+    [Inject] private AuthStateProvider AuthState { get; set; } = default!;
+    [Inject] private IAuthService AuthService { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+    [Inject] private FulfillmentStateService FulfillmentState { get; set; } = default!;
+    [Inject] private LocalizationService Localization { get; set; } = default!;
+    [Inject] private NotificationHubService NotificationHub { get; set; } = default!;
+    [Inject] private OrderNotificationHandler OrderNotificationHandler { get; set; } = default!;
+
+    private bool _isInitializing = true;
+    private bool _isAuthenticated;
+    private bool _drawerOpen = true;
+    private string? _username;
+    private string? _email;
+
+    private readonly MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight
+        {
+            Primary = "#E91E63",
+            Secondary = "#9C27B0",
+            AppbarBackground = "#E91E63"
+        },
+        PaletteDark = new PaletteDark
+        {
+            Primary = "#E91E63",
+            Secondary = "#9C27B0",
+            AppbarBackground = "#1F1F1F",
+            Background = "#121212",
+            Surface = "#1E1E1E",
+            DrawerBackground = "#1E1E1E"
+        }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        AuthState.OnAuthStateChanged += HandleAuthStateChanged;
+        Localization.OnLanguageChanged += HandleLanguageChangedEvent;
+
+        await Localization.InitializeAsync();
+        await AuthState.InitializeAsync();
+        _isAuthenticated = await AuthState.IsAuthenticatedAsync();
+
+        if (_isAuthenticated)
+        {
+            _username = await AuthState.GetUsernameAsync();
+            _email = await AuthState.GetEmailAsync();
+
+            // Set Spanish for cocina@Comanda.com
+            if (_email == "cocina@Comanda.com")
+            {
+                await Localization.SetLanguageAsync("es");
+            }
+
+            await StartServicesAsync();
+        }
+        else
+        {
+            var currentUri = Navigation.Uri;
+            if (!currentUri.Contains("/login"))
+            {
+                Navigation.NavigateTo("/login");
+            }
+        }
+
+        _isInitializing = false;
+    }
+
+    private void HandleAuthStateChanged()
+    {
+        InvokeAsync(async () =>
+        {
+            _isAuthenticated = await AuthState.IsAuthenticatedAsync();
+
+            if (_isAuthenticated)
+            {
+                _username = await AuthState.GetUsernameAsync();
+                _email = await AuthState.GetEmailAsync();
+
+                // Set Spanish for cocina@Comanda.com (on login)
+                if (_email == "cocina@Comanda.com")
+                {
+                    await Localization.SetLanguageAsync("es");
+                }
+
+                await StartServicesAsync();
+            }
+            else
+            {
+                await StopServicesAsync();
+                Navigation.NavigateTo("/login");
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    private async Task StartServicesAsync()
+    {
+        // Start polling for orders (fallback, less frequent since SignalR handles real-time)
+        FulfillmentState.StartPolling(intervalSeconds: 60);
+
+        // Start SignalR connection for real-time updates
+        // Run in background with error handling to prevent app crash if SignalR fails
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await NotificationHub.StartAsync();
+                OrderNotificationHandler.StartListening();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to start notification hub: {ex.Message}");
+                // App continues to work without real-time notifications
+            }
+        });
+    }
+
+    private async Task StopServicesAsync()
+    {
+        // Stop real-time notifications
+        OrderNotificationHandler.StopListening();
+        await NotificationHub.StopAsync();
+
+        // Stop polling
+        FulfillmentState.StopPolling();
+    }
+    
+    private void HandleLanguageChangedEvent()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task HandleLanguageChanged(string languageCode)
+    {
+        await Localization.SetLanguageAsync(languageCode);
+    }
+
+    private void ToggleDrawer()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+
+    private async Task HandleLogout()
+    {
+        await AuthService.LogoutAsync();
+        Snackbar.Add(Localization["SignOut"], Severity.Info);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        AuthState.OnAuthStateChanged -= HandleAuthStateChanged;
+        Localization.OnLanguageChanged -= HandleLanguageChangedEvent;
+        await StopServicesAsync();
+    }
+}
+
+
+
+
+
+
+

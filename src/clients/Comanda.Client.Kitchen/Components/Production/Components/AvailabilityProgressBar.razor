@@ -1,0 +1,87 @@
+@* A progress bar showing availability as small squares *@
+
+<div class="availability-progress-bar">
+    @for (int i = 0; i < TotalBoxes; i++)
+    {
+        var isFilled = i < FilledBoxes;
+        var boxClass = isFilled ? $"box filled {GetColorClass()}" : "box empty";
+        <div class="@boxClass"></div>
+    }
+</div>
+
+<style>
+    .availability-progress-bar {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 2px;
+        width: 100%;
+        min-height: 8px;
+    }
+    
+    .availability-progress-bar .box {
+        flex: 1;
+        min-width: 4px;
+        max-width: 12px;
+        height: 8px;
+        border-radius: 2px;
+        transition: background-color 0.2s ease;
+    }
+    
+    .availability-progress-bar .box.empty {
+        background-color: rgba(128, 128, 128, 0.3);
+    }
+    
+    .availability-progress-bar .box.filled.green {
+        background-color: #4caf50;
+    }
+    
+    .availability-progress-bar .box.filled.yellow {
+        background-color: #ff9800;
+    }
+    
+    .availability-progress-bar .box.filled.red {
+        background-color: #f44336;
+    }
+</style>
+
+@code {
+    /// <summary>
+    /// Number of portions produced
+    /// </summary>
+    [Parameter] public int Produced { get; set; }
+    
+    /// <summary>
+    /// Number of portions available (produced - committed)
+    /// </summary>
+    [Parameter] public int Available { get; set; }
+    
+    /// <summary>
+    /// Number of boxes to show (default 20)
+    /// </summary>
+    [Parameter] public int TotalBoxes { get; set; } = 20;
+    
+    private int FilledBoxes => Produced > 0 
+        ? Math.Min(TotalBoxes, (int)Math.Ceiling((double)Available / Produced * TotalBoxes))
+        : 0;
+    
+    private double AvailablePercent => Produced > 0 
+        ? (double)Available / Produced * 100 
+        : 0;
+    
+    private string GetColorClass()
+    {
+        return AvailablePercent switch
+        {
+            > 40 => "green",
+            > 20 => "yellow",
+            _ => "red"
+        };
+    }
+}
+
+
+
+
+
+
+

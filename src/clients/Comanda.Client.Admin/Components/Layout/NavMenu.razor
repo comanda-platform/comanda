@@ -1,0 +1,86 @@
+<MudNavMenu>
+    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">
+        Dashboard
+    </MudNavLink>
+
+    <MudNavGroup Title="Orders" Icon="@Icons.Material.Filled.ShoppingCart" Expanded="true">
+        <MudNavLink Href="/orders" Icon="@Icons.Material.Filled.List">
+            All Orders
+        </MudNavLink>
+        <MudNavLink Href="/orders/create" Icon="@Icons.Material.Filled.Add">
+            Create Order
+        </MudNavLink>
+    </MudNavGroup>
+
+    <MudNavGroup Title="Clients" Icon="@Icons.Material.Filled.People">
+        <MudNavLink Href="/clients" Icon="@Icons.Material.Filled.Person">
+            All Clients
+        </MudNavLink>
+        <MudNavLink Href="/client-groups" Icon="@Icons.Material.Filled.Groups">
+            Client Groups
+        </MudNavLink>
+        <MudNavLink Href="/locations" Icon="@Icons.Material.Filled.Place">
+            Locations
+        </MudNavLink>
+    </MudNavGroup>
+
+    <MudNavGroup Title="Financial" Icon="@Icons.Material.Filled.AttachMoney">
+        <MudNavLink Href="/ledger" Icon="@Icons.Material.Filled.AccountBalance">
+            Ledger
+        </MudNavLink>
+        <MudNavLink Href="/expenses" Icon="@Icons.Material.Filled.Receipt">
+            Expenses
+        </MudNavLink>
+    </MudNavGroup>
+
+    <MudNavGroup Title="Products & Menus" Icon="@Icons.Material.Filled.Restaurant">
+        <MudNavLink Href="/products" Icon="@Icons.Material.Filled.Inventory">
+            Products
+        </MudNavLink>
+        <MudNavLink Href="/daily-menus" Icon="@Icons.Material.Filled.MenuBook">
+            Daily Menus
+        </MudNavLink>
+        <MudNavLink Href="/recipes" Icon="@Icons.Material.Filled.Book">
+            Recipes
+        </MudNavLink>
+        <MudNavLink Href="/sides" Icon="@Icons.Material.Filled.Fastfood">
+            Sides
+        </MudNavLink>
+    </MudNavGroup>
+
+    <MudNavGroup Title="Production" Icon="@Icons.Material.Filled.Factory">
+        <MudNavLink Href="/batches" Icon="@Icons.Material.Filled.Workspaces">
+            Batches
+        </MudNavLink>
+    </MudNavGroup>
+
+    <MudNavGroup Title="Inventory" Icon="@Icons.Material.Filled.Warehouse">
+        <MudNavLink Href="/inventory-items" Icon="@Icons.Material.Filled.Category">
+            Items
+        </MudNavLink>
+        <MudNavLink Href="/inventory-purchases" Icon="@Icons.Material.Filled.ShoppingBag">
+            Purchases
+        </MudNavLink>
+        <MudNavLink Href="/suppliers" Icon="@Icons.Material.Filled.LocalShipping">
+            Suppliers
+        </MudNavLink>
+    </MudNavGroup>
+
+    <MudNavLink Href="/employees" Icon="@Icons.Material.Filled.Badge">
+        Employees
+    </MudNavLink>
+</MudNavMenu>
+
+@code {
+
+}
+
+
+
+
+
+
+
+
+
+

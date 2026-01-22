@@ -1,0 +1,368 @@
+@page "/ledger"
+@attribute [Authorize]
+@using Comanda.Client.Admin.Models
+@using Comanda.Shared.Enums
+
+<PageTitle>Ledger - Comanda Admin</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Client Ledger</MudText>
+
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" sm="3">
+            <MudTextField @bind-Value="_filterClientId"
+                          Label="Client ID"
+                          Variant="Variant.Outlined"
+                          Placeholder="Filter by client..." />
+        </MudItem>
+
+        <MudItem xs="12" sm="3">
+            <MudSelect T="LedgerEntryType?"
+                       @bind-Value="_filterType"
+                       Label="Entry Type"
+                       Variant="Variant.Outlined"
+                       Clearable="true">
+                <MudSelectItem T="LedgerEntryType?" Value="null">All Types</MudSelectItem>
+                @foreach (LedgerEntryType type in Enum.GetValues(typeof(LedgerEntryType)))
+                {
+                    <MudSelectItem Value="@type">@type</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+
+        <MudItem xs="12" sm="2">
+            <MudDatePicker @bind-Date="_filterFrom"
+                           Label="From Date"
+                           Variant="Variant.Outlined"
+                           Clearable="true" />
+        </MudItem>
+
+        <MudItem xs="12" sm="2">
+            <MudDatePicker @bind-Date="_filterTo"
+                           Label="To Date"
+                           Variant="Variant.Outlined"
+                           Clearable="true" />
+        </MudItem>
+
+        <MudItem xs="12" sm="2" Class="d-flex align-end">
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       OnClick="ApplyFiltersAsync"
+                       FullWidth="true"
+                       StartIcon="@Icons.Material.Filled.FilterList">
+                Apply
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+}
+else
+{
+    <MudPaper Elevation="2" Class="pa-4 mb-4">
+        <MudText Typo="Typo.h6" Class="mb-3">Quick Actions</MudText>
+        <MudStack Row="true" Spacing="2">
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Success"
+                       StartIcon="@Icons.Material.Filled.Payment"
+                       OnClick="() => OpenAddEntryDialog(LedgerEntryType.Payment)">
+                Record Payment
+            </MudButton>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.AddCircle"
+                       OnClick="() => OpenAddEntryDialog(LedgerEntryType.Credit)">
+                Add Credit
+            </MudButton>
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Secondary"
+                       StartIcon="@Icons.Material.Filled.Edit"
+                       OnClick="() => OpenAddEntryDialog(LedgerEntryType.Adjustment)">
+                Add Adjustment
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+
+    <MudPaper Elevation="2" Class="pa-4">
+        <div class="d-flex justify-space-between align-center mb-4">
+            <MudText Typo="Typo.h6">@_filteredEntries.Count() Ledger Entries</MudText>
+        </div>
+
+        @if (_filteredEntries.Any())
+        {
+            <MudTable Items="@_filteredEntries"
+                      Hover="true"
+                      Breakpoint="Breakpoint.Sm"
+                      Dense="false"
+                      Loading="@_isLoading"
+                      LoadingProgressColor="Color.Primary">
+                <HeaderContent>
+                    <MudTh>Date</MudTh>
+                    <MudTh>Client</MudTh>
+                    <MudTh>Type</MudTh>
+                    <MudTh>Debit</MudTh>
+                    <MudTh>Credit</MudTh>
+                    <MudTh>Payment Method</MudTh>
+                    <MudTh>Order Line</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Date">
+                        @context.OccurredAt.ToString("g")
+                    </MudTd>
+                    <MudTd DataLabel="Client">
+                        <MudLink Href="@($"/clients/{context.ClientPublicId}")">
+                            @context.ClientPublicId
+                        </MudLink>
+                    </MudTd>
+                    <MudTd DataLabel="Type">
+                        <MudChip T="string" Size="Size.Small" Color="@GetTypeColor(context.Type)">
+                            @context.Type
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Debit">
+                        @if (context.IsDebit())
+                        {
+                            <MudText Typo="Typo.body1" Color="Color.Error">
+                                <strong>@context.AbsoluteAmount().ToString("C")</strong>
+                            </MudText>
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Secondary">-</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Credit">
+                        @if (context.IsCredit())
+                        {
+                            <MudText Typo="Typo.body1" Color="Color.Success">
+                                <strong>@context.AbsoluteAmount().ToString("C")</strong>
+                            </MudText>
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Secondary">-</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Payment Method">
+                        @if (context.PaymentMethod.HasValue)
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@context.PaymentMethod</MudChip>
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Secondary">-</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Order Line">
+                        @if (!string.IsNullOrEmpty(context.OrderLinePublicId))
+                        {
+                            <MudText>@context.OrderLinePublicId</MudText>
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Secondary">-</MudText>
+                        }
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+                </PagerContent>
+            </MudTable>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info">
+                No ledger entries found matching the current filters.
+            </MudAlert>
+        }
+    </MudPaper>
+}
+
+<!-- Add Entry Dialog -->
+<MudDialog @bind-Visible="_showAddEntryDialog">
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-3">Add @_newEntryType Entry</MudText>
+        <MudTextField @bind-Value="_newClientId"
+                      Label="Client ID"
+                      Variant="Variant.Outlined"
+                      Required="true"
+                      Class="mb-3" />
+        <MudNumericField @bind-Value="_newAmount"
+                         Label="Amount"
+                         Variant="Variant.Outlined"
+                         Format="C2"
+                         Min="0.01m"
+                         Required="true"
+                         Class="mb-3" />
+        @if (_newEntryType == LedgerEntryType.Payment)
+        {
+            <MudSelect T="PaymentMethod"
+                       @bind-Value="_newPaymentMethod"
+                       Label="Payment Method"
+                       Variant="Variant.Outlined"
+                       Required="true">
+                @foreach (PaymentMethod method in Enum.GetValues(typeof(PaymentMethod)))
+                {
+                    <MudSelectItem Value="@method">@method</MudSelectItem>
+                }
+            </MudSelect>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showAddEntryDialog = false)">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="AddEntryAsync">Add</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Inject] private LedgerApiService LedgerApiService { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+
+    private bool _isLoading = true;
+    private List<LedgerEntryResponse> _allEntries = new();
+    private IEnumerable<LedgerEntryResponse> _filteredEntries = new List<LedgerEntryResponse>();
+
+    private string? _filterClientId;
+    private LedgerEntryType? _filterType;
+    private DateTime? _filterFrom;
+    private DateTime? _filterTo;
+
+    private bool _showAddEntryDialog = false;
+    private LedgerEntryType _newEntryType;
+    private string _newClientId = string.Empty;
+    private decimal _newAmount = 0;
+    private PaymentMethod _newPaymentMethod = PaymentMethod.Cash;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEntriesAsync();
+    }
+
+    private async Task LoadEntriesAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _allEntries = (await LedgerApiService.GetLedgerEntriesAsync()).ToList();
+            ApplyFilters();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading ledger entries: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ApplyFiltersAsync()
+    {
+        ApplyFilters();
+        await Task.CompletedTask;
+    }
+
+    private void ApplyFilters()
+    {
+        _filteredEntries = _allEntries.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(_filterClientId))
+        {
+            var clientIdLower = _filterClientId.ToLower();
+            _filteredEntries = _filteredEntries.Where(e => e.ClientPublicId.ToLower().Contains(clientIdLower));
+        }
+
+        if (_filterType.HasValue)
+        {
+            _filteredEntries = _filteredEntries.Where(e => e.Type == _filterType.Value);
+        }
+
+        if (_filterFrom.HasValue)
+        {
+            _filteredEntries = _filteredEntries.Where(e => e.OccurredAt >= _filterFrom.Value);
+        }
+
+        if (_filterTo.HasValue)
+        {
+            _filteredEntries = _filteredEntries.Where(e => e.OccurredAt <= _filterTo.Value);
+        }
+
+        _filteredEntries = _filteredEntries.OrderByDescending(e => e.OccurredAt).ToList();
+    }
+
+    private void OpenAddEntryDialog(LedgerEntryType type)
+    {
+        _newEntryType = type;
+        _newClientId = string.Empty;
+        _newAmount = 0;
+        _newPaymentMethod = PaymentMethod.Cash;
+        _showAddEntryDialog = true;
+    }
+
+    private async Task AddEntryAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newClientId) || _newAmount <= 0)
+        {
+            Snackbar.Add("Please enter valid client ID and amount", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            LedgerEntryResponse? created = null;
+
+            switch (_newEntryType)
+            {
+                case LedgerEntryType.Payment:
+                    created = await LedgerApiService.CreatePaymentAsync(new CreatePaymentRequest(_newClientId, _newAmount, _newPaymentMethod));
+                    break;
+                case LedgerEntryType.Credit:
+                    created = await LedgerApiService.CreateCreditAsync(new CreateCreditRequest(_newClientId, _newAmount, null));
+                    break;
+                case LedgerEntryType.Adjustment:
+                    created = await LedgerApiService.CreateAdjustmentAsync(new CreateAdjustmentRequest(_newClientId, _newAmount));
+                    break;
+            }
+
+            if (created != null)
+            {
+                Snackbar.Add($"{_newEntryType} entry added successfully", Severity.Success);
+                _showAddEntryDialog = false;
+                await LoadEntriesAsync();
+            }
+            else
+            {
+                Snackbar.Add("Failed to add entry", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error adding entry: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private Color GetTypeColor(LedgerEntryType type)
+    {
+        return type switch
+        {
+            LedgerEntryType.Credit => Color.Primary,
+            LedgerEntryType.Payment => Color.Success,
+            LedgerEntryType.Adjustment => Color.Warning,
+            LedgerEntryType.WriteOff => Color.Error,
+            _ => Color.Default
+        };
+    }
+}
+
+
+
+
+
+
+
+
+
+

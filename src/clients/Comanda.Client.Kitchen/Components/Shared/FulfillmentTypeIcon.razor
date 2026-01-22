@@ -1,0 +1,34 @@
+@using Comanda.Client.Kitchen.Infrastructure.Localization
+@inject LocalizationService L
+
+@{
+    var (icon, tooltipKey) = GetIconInfo();
+}
+
+<MudTooltip Text="@L[tooltipKey]">
+    <MudIcon Icon="@icon" Color="@Color" Size="@Size" />
+</MudTooltip>
+
+@code {
+    [Parameter, EditorRequired] public OrderFulfillmentType FulfillmentType { get; set; }
+    [Parameter] public Color Color { get; set; } = Color.Default;
+    [Parameter] public Size Size { get; set; } = Size.Medium;
+
+    private (string icon, string tooltipKey) GetIconInfo()
+    {
+        return FulfillmentType switch
+        {
+            OrderFulfillmentType.DineIn => (Icons.Material.Filled.TableRestaurant, "DineIn"),
+            OrderFulfillmentType.TakeAway => (Icons.Material.Filled.TakeoutDining, "TakeAway"),
+            OrderFulfillmentType.Delivery => (Icons.Material.Filled.DeliveryDining, "Delivery"),
+            _ => (Icons.Material.Filled.Help, "Unknown")
+        };
+    }
+}
+
+
+
+
+
+
+

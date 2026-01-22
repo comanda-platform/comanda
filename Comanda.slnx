@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/asdasd/" />
+  <Folder Name="/src/" />
+  <Folder Name="/src/clients/">
+    <Project Path="src/clients/Comanda.Client.Admin/Comanda.Client.Admin.csproj" />
+    <Project Path="src/clients/Comanda.Client.Delivery/Comanda.Client.Delivery.csproj" />
+    <Project Path="src/clients/Comanda.Client.Kitchen/Comanda.Client.Kitchen.csproj">
+      <Deploy Solution="Debug|*" />
+    </Project>
+  </Folder>
+  <Folder Name="/src/core/">
+    <Project Path="src/core/Comanda.Api/Comanda.Api.csproj" />
+    <Project Path="src/core/Comanda.Application/Comanda.Application.csproj" />
+    <Project Path="src/core/Comanda.Database/Comanda.Database.csproj" />
+    <Project Path="src/core/Comanda.Domain/Comanda.Domain.csproj" />
+    <Project Path="src/core/Comanda.Infrastructure/Comanda.Infrastructure.csproj" />
+    <Project Path="src/core/Comanda.Shared/Comanda.Shared.csproj" />
+  </Folder>
+</Solution>

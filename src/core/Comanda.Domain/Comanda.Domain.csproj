@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Comanda.Infrastructure" />
+    <InternalsVisibleTo Include="Comanda.Application" />
+    <InternalsVisibleTo Include="Comanda.Domain.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Ulid" Version="1.4.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Comanda.Shared\Comanda.Shared.csproj" />
+  </ItemGroup>
+
+</Project>
+
+
+
+
+
+
+

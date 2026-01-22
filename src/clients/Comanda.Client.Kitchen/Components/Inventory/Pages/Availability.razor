@@ -1,0 +1,95 @@
+@page "/availability"
+@implements IDisposable
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+    <MudText Typo="Typo.h4">Availability Status</MudText>
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+        @if (_lowCount > 0)
+        {
+            <MudChip T="string" Color="@(_soldOutCount > 0 ? Color.Error : Color.Warning)" Size="Size.Small">
+                @_lowCount items need attention
+            </MudChip>
+        }
+        <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                       Color="Color.Primary"
+                       OnClick="RefreshAvailability" />
+    </MudStack>
+</MudStack>
+
+@if (!AvailabilityState.Availability.Any())
+{
+    <MudAlert Severity="Severity.Info" Class="mt-4">
+        <MudStack AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Inventory" Size="Size.Large" />
+            <MudText>No availability data yet.</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Start cooking items on the Production Board to see availability.
+            </MudText>
+            <MudButton Variant="Variant.Outlined"
+                       Color="Color.Primary"
+                       Href="/production"
+                       StartIcon="@Icons.Material.Filled.ArrowForward">
+                Go to Production
+            </MudButton>
+        </MudStack>
+    </MudAlert>
+}
+else
+{
+    <AvailabilityIndicators />
+}
+
+@code {
+    [Inject] private AvailabilityStateService AvailabilityState { get; set; } = default!;
+    [Inject] private ProductionStateService ProductionState { get; set; } = default!;
+
+    private int _lowCount;
+    private int _soldOutCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        AvailabilityState.OnAvailabilityChanged += HandleAvailabilityChanged;
+
+        // Trigger a recalculation
+        AvailabilityState.RecalculateAvailability();
+        UpdateCounts();
+
+        // Ensure production data is loaded for today
+        if (ProductionState.CurrentMenu == null)
+        {
+            await ProductionState.LoadMenuForDateAsync(DateOnly.FromDateTime(DateTime.Today));
+        }
+    }
+
+    private void HandleAvailabilityChanged()
+    {
+        InvokeAsync(() =>
+        {
+            UpdateCounts();
+            StateHasChanged();
+        });
+    }
+
+    private void UpdateCounts()
+    {
+        _lowCount = AvailabilityState.GetLowAvailabilityCount();
+        _soldOutCount = AvailabilityState.GetItemsByLevel(AvailabilityLevel.SoldOut).Count();
+    }
+
+    private void RefreshAvailability()
+    {
+        AvailabilityState.RecalculateAvailability();
+    }
+
+    public void Dispose()
+    {
+        AvailabilityState.OnAvailabilityChanged -= HandleAvailabilityChanged;
+    }
+}
+
+
+
+
+
+
+

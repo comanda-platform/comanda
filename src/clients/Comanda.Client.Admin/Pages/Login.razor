@@ -1,0 +1,125 @@
+@page "/login"
+@layout LoginLayout
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="d-flex align-center justify-center" Style="min-height: 100vh;">
+    <MudPaper Elevation="8" Class="pa-8" Style="width: 100%;">
+        <MudText Typo="Typo.h4" Align="Align.Center" GutterBottom="true">
+            Comanda
+        </MudText>
+        <MudText Typo="Typo.h6" Align="Align.Center" GutterBottom="true" Color="Color.Secondary">
+            Admin Panel
+        </MudText>
+
+        @if (_isLoading)
+        {
+            <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+        }
+
+        <EditForm Model="@_loginModel" OnValidSubmit="HandleLoginAsync">
+            <DataAnnotationsValidator />
+
+            <MudTextField @bind-Value="_loginModel.Email"
+                          For="@(() => _loginModel.Email)"
+                          Label="Email"
+                          Variant="Variant.Outlined"
+                          FullWidth="true"
+                          Class="my-4"
+                          Disabled="@_isLoading" />
+
+            <MudTextField @bind-Value="_loginModel.Password"
+                          For="@(() => _loginModel.Password)"
+                          Label="Password"
+                          Variant="Variant.Outlined"
+                          InputType="InputType.Password"
+                          FullWidth="true"
+                          Class="my-4"
+                          Disabled="@_isLoading" />
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Class="my-4">
+                    @_errorMessage
+                </MudAlert>
+            }
+
+            <MudButton ButtonType="ButtonType.Submit"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       FullWidth="true"
+                       Size="Size.Large"
+                       Disabled="@_isLoading">
+                @if (_isLoading)
+                {
+                    <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                    <MudText Class="ms-2">Logging in...</MudText>
+                }
+                else
+                {
+                    <MudText>Login</MudText>
+                }
+            </MudButton>
+        </EditForm>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Inject] private AuthApiService AuthApiService { get; set; } = default!;
+    [Inject] private TokenService TokenService { get; set; } = default!;
+    [Inject] private AuthenticationStateProvider AuthStateProvider { get; set; } = default!;
+    [Inject] private NavigationManager NavigationManager { get; set; } = default!;
+
+    private LoginModel _loginModel = new();
+    private bool _isLoading;
+    private string? _errorMessage;
+
+    private async Task HandleLoginAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var response = await AuthApiService.LoginAsync(_loginModel.Email, _loginModel.Password);
+
+            if (response != null)
+            {
+                await TokenService.SetTokenAsync(response.Token);
+
+                if (AuthStateProvider is CustomAuthStateProvider customAuthStateProvider)
+                {
+                    customAuthStateProvider.NotifyUserAuthentication(response.Token);
+                }
+
+                NavigationManager.NavigateTo("/", true);
+            }
+            else
+            {
+                _errorMessage = "Invalid email or password.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"An error occurred: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private class LoginModel
+    {
+        public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+    }
+}
+
+
+
+
+
+
+
+
+
+

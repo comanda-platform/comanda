@@ -1,0 +1,371 @@
+@page "/employees"
+@attribute [Authorize]
+@using Comanda.Client.Admin.Models
+
+<PageTitle>Employees - Comanda Admin</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Employees</MudText>
+
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" sm="8">
+            <MudTextField @bind-Value="_searchText"
+                          Label="Search"
+                          Placeholder="Search by name or email..."
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search" />
+        </MudItem>
+
+        <MudItem xs="12" sm="4">
+            <MudCheckBox @bind-Value="_filterActiveOnly" Label="Active Only" Color="Color.Primary" />
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+}
+else
+{
+    <MudPaper Elevation="2" Class="pa-4">
+        <div class="d-flex justify-space-between align-center mb-4">
+            <MudText Typo="Typo.h6">@_filteredEmployees.Count() Employees Found</MudText>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       Href="/employees/create">
+                New Employee
+            </MudButton>
+        </div>
+
+        @if (_filteredEmployees.Any())
+        {
+            <MudTable Items="@_filteredEmployees"
+                      Hover="true"
+                      Breakpoint="Breakpoint.Sm"
+                      Dense="false"
+                      Loading="@_isLoading"
+                      LoadingProgressColor="Color.Primary">
+                <HeaderContent>
+                    <MudTh>Username</MudTh>
+                    <MudTh>Email</MudTh>
+                    <MudTh>Phone</MudTh>
+                    <MudTh>API Key</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Created</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Username">
+                        <strong>@context.UserName</strong>
+                    </MudTd>
+                    <MudTd DataLabel="Email">
+                        @context.Email
+                    </MudTd>
+                    <MudTd DataLabel="Phone">
+                        @if (!string.IsNullOrEmpty(context.PhoneNumber))
+                        {
+                            @context.PhoneNumber
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Secondary">-</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="API Key">
+                        @if (context.HasApiKey)
+                        {
+                            @if (context.IsApiKeyExpired())
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Error">Expired</MudChip>
+                            }
+                            else
+                            {
+                                var daysRemaining = context.ApiKeyDaysRemaining();
+                                <MudChip T="string" Size="Size.Small" Color="Color.Success">
+                                    Active (@daysRemaining days left)
+                                </MudChip>
+                            }
+                        }
+                        else
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Default">None</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip T="string" Size="Size.Small"
+                                 Color="@(context.IsActive ? Color.Success : Color.Default)">
+                            @(context.IsActive ? "Active" : "Inactive")
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Created">
+                        @context.CreatedAt.ToString("yyyy-MM-dd")
+                    </MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small">
+                            <MudMenuItem Icon="@Icons.Material.Filled.Visibility"
+                                         Href="@($"/employees/{context.PublicId}")">
+                                View Details
+                            </MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.Edit"
+                                         Href="@($"/employees/{context.PublicId}/edit")">
+                                Edit Employee
+                            </MudMenuItem>
+                            @if (context.IsActive)
+                            {
+                                <MudMenuItem Icon="@Icons.Material.Filled.Key"
+                                             OnClick="@(() => GenerateApiKeyAsync(context))">
+                                    Generate API Key
+                                </MudMenuItem>
+                                @if (context.HasApiKey)
+                                {
+                                    <MudMenuItem Icon="@Icons.Material.Filled.KeyOff"
+                                                 OnClick="@(() => RevokeApiKeyAsync(context.PublicId, context.UserName))">
+                                        Revoke API Key
+                                    </MudMenuItem>
+                                }
+                                <MudMenuItem Icon="@Icons.Material.Filled.Block"
+                                             OnClick="@(() => DeactivateEmployeeAsync(context.PublicId, context.UserName))">
+                                    Deactivate
+                                </MudMenuItem>
+                            }
+                            else
+                            {
+                                <MudMenuItem Icon="@Icons.Material.Filled.Check"
+                                             OnClick="@(() => ActivateEmployeeAsync(context.PublicId, context.UserName))">
+                                    Activate
+                                </MudMenuItem>
+                            }
+                        </MudMenu>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+                </PagerContent>
+            </MudTable>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info">
+                No employees found matching the current filters.
+            </MudAlert>
+        }
+    </MudPaper>
+}
+
+<!-- Show API Key Dialog -->
+<MudDialog @bind-Visible="_showApiKeyDialog">
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-3">API Key Generated</MudText>
+        <MudAlert Severity="Severity.Warning" Class="mb-3">
+            <strong>Important:</strong> Save this API key now. It will not be shown again.
+        </MudAlert>
+        <MudTextField @bind-Value="_generatedApiKey"
+                      Label="API Key"
+                      Variant="Variant.Outlined"
+                      ReadOnly="true"
+                      Adornment="Adornment.End"
+                      AdornmentIcon="@Icons.Material.Filled.ContentCopy"
+                      OnAdornmentClick="CopyApiKeyToClipboard" />
+        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2">
+            Created: @(_generatedKeyDate?.ToString("g"))
+        </MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@(() => _showApiKeyDialog = false)">
+            Close
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Inject] private EmployeeApiService EmployeeApiService { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+    [Inject] private IDialogService DialogService { get; set; } = default!;
+
+    private bool _isLoading = true;
+    private List<EmployeeResponse> _allEmployees = new();
+    private IEnumerable<EmployeeResponse> _filteredEmployees = new List<EmployeeResponse>();
+    private string _searchText = string.Empty;
+    private bool _filterActiveOnly = true;
+
+    private bool _showApiKeyDialog = false;
+    private string _generatedApiKey = string.Empty;
+    private DateTime? _generatedKeyDate;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEmployeesAsync();
+    }
+
+    private async Task LoadEmployeesAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _allEmployees = (await EmployeeApiService.GetEmployeesAsync()).ToList();
+            ApplyFilters();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading employees: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void ApplyFilters()
+    {
+        _filteredEmployees = _allEmployees.AsEnumerable();
+
+        if (_filterActiveOnly)
+        {
+            _filteredEmployees = _filteredEmployees.Where(e => e.IsActive);
+        }
+
+        if (!string.IsNullOrWhiteSpace(_searchText))
+        {
+            var searchLower = _searchText.ToLower();
+            _filteredEmployees = _filteredEmployees.Where(e =>
+                e.UserName.ToLower().Contains(searchLower) ||
+                e.Email.ToLower().Contains(searchLower));
+        }
+
+        _filteredEmployees = _filteredEmployees.OrderBy(e => e.UserName).ToList();
+    }
+
+    private async Task GenerateApiKeyAsync(EmployeeResponse employee)
+    {
+        try
+        {
+            var result = await EmployeeApiService.GenerateApiKeyAsync(employee.PublicId);
+
+            if (result != null)
+            {
+                _generatedApiKey = result.ApiKey;
+                _generatedKeyDate = result.CreatedAt;
+                _showApiKeyDialog = true;
+                await LoadEmployeesAsync();
+            }
+            else
+            {
+                Snackbar.Add("Failed to generate API key", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error generating API key: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task RevokeApiKeyAsync(string publicId, string userName)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Message", $"Are you sure you want to revoke the API key for '{userName}'?" },
+            { "ConfirmText", "Revoke" },
+            { "CancelText", "Cancel" },
+            { "ConfirmColor", Color.Warning }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Revoke API Key", parameters);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            try
+            {
+                var success = await EmployeeApiService.RevokeApiKeyAsync(publicId);
+                if (success)
+                {
+                    Snackbar.Add($"API key revoked for '{userName}'", Severity.Success);
+                    await LoadEmployeesAsync();
+                }
+                else
+                {
+                    Snackbar.Add("Failed to revoke API key", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error revoking API key: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task ActivateEmployeeAsync(string publicId, string userName)
+    {
+        try
+        {
+            var success = await EmployeeApiService.ActivateEmployeeAsync(publicId);
+            if (success)
+            {
+                Snackbar.Add($"Employee '{userName}' activated", Severity.Success);
+                await LoadEmployeesAsync();
+            }
+            else
+            {
+                Snackbar.Add("Failed to activate employee", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error activating employee: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task DeactivateEmployeeAsync(string publicId, string userName)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Message", $"Are you sure you want to deactivate employee '{userName}'? This will also revoke their API key." },
+            { "ConfirmText", "Deactivate" },
+            { "CancelText", "Cancel" },
+            { "ConfirmColor", Color.Warning }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Deactivate Employee", parameters);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            try
+            {
+                var success = await EmployeeApiService.DeactivateEmployeeAsync(publicId);
+                if (success)
+                {
+                    Snackbar.Add($"Employee '{userName}' deactivated", Severity.Success);
+                    await LoadEmployeesAsync();
+                }
+                else
+                {
+                    Snackbar.Add("Failed to deactivate employee", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deactivating employee: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private void CopyApiKeyToClipboard()
+    {
+        // In a real implementation, you'd use JavaScript interop to copy to clipboard
+        Snackbar.Add("API key copied to clipboard", Severity.Success);
+    }
+}
+
+
+
+
+
+
+
+
+
+

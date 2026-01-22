@@ -1,0 +1,176 @@
+@* Pull to refresh component for mobile devices *@
+@using Comanda.Client.Kitchen.Infrastructure.Localization
+@inject IJSRuntime JS
+@inject LocalizationService L
+
+<div class="pull-to-refresh-container" @ref="_containerRef">
+    @if (_isPulling || _isRefreshing)
+    {
+        <div class="pull-to-refresh-indicator @(_isRefreshing ? "refreshing" : "")">
+            @if (_isRefreshing)
+            {
+                <MudProgressCircular Color="Color.Primary" Size="Size.Small" Indeterminate="true" />
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-2">@L["Refreshing"]</MudText>
+            }
+            else
+            {
+                <MudIcon Icon="@Icons.Material.Filled.ArrowDownward"
+                         Color="Color.Secondary"
+                         Style="@GetPullIconStyle()" />
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-2">
+                    @(_pullProgress >= 1 ? L["ReleaseToRefresh"] : L["PullToRefresh"])
+                </MudText>
+            }
+        </div>
+    }
+    
+    <div class="pull-to-refresh-content" style="@GetContentStyle()">
+        @ChildContent
+    </div>
+</div>
+
+<style>
+    .pull-to-refresh-container {
+        position: relative;
+        overflow-y: auto;
+        overflow-x: hidden;
+        height: 100%;
+        touch-action: pan-y;
+    }
+    
+    .pull-to-refresh-indicator {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 60px;
+        transform: translateY(-60px);
+        transition: transform 0.2s ease-out;
+        z-index: 10;
+    }
+    
+    .pull-to-refresh-indicator.refreshing {
+        transform: translateY(0);
+    }
+    
+    .pull-to-refresh-content {
+        transition: transform 0.2s ease-out;
+    }
+</style>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public EventCallback OnRefresh { get; set; }
+    [Parameter] public int PullThreshold { get; set; } = 80;
+    
+    private ElementReference _containerRef;
+    private bool _isPulling;
+    private bool _isRefreshing;
+    private double _pullDistance;
+    private double _pullProgress;
+    private double _startY;
+    private bool _isAtTop;
+    
+    private DotNetObjectReference<PullToRefresh>? _objRef;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _objRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("initPullToRefresh", _containerRef, _objRef);
+        }
+    }
+
+    [JSInvokable]
+    public void OnTouchStart(double startY, bool isAtTop)
+    {
+        _startY = startY;
+        _isAtTop = isAtTop;
+        _isPulling = false;
+        _pullDistance = 0;
+        _pullProgress = 0;
+    }
+
+    [JSInvokable]
+    public void OnTouchMove(double currentY)
+    {
+        if (_isRefreshing || !_isAtTop)
+            return;
+
+        var delta = currentY - _startY;
+        
+        if (delta > 0)
+        {
+            _isPulling = true;
+            // Apply resistance (damping)
+            _pullDistance = Math.Min(delta * 0.5, PullThreshold * 1.5);
+            _pullProgress = Math.Min(_pullDistance / PullThreshold, 1);
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnTouchEnd()
+    {
+        if (!_isPulling || _isRefreshing)
+            return;
+
+        if (_pullProgress >= 1)
+        {
+            _isRefreshing = true;
+            _isPulling = false;
+            _pullDistance = 60; // Keep indicator visible
+            StateHasChanged();
+            
+            try
+            {
+                await OnRefresh.InvokeAsync();
+            }
+            finally
+            {
+                _isRefreshing = false;
+                _pullDistance = 0;
+                _pullProgress = 0;
+                StateHasChanged();
+            }
+        }
+        else
+        {
+            _isPulling = false;
+            _pullDistance = 0;
+            _pullProgress = 0;
+            StateHasChanged();
+        }
+    }
+
+    private string GetPullIconStyle()
+    {
+        var rotation = Math.Min(_pullProgress * 180, 180);
+        return $"transform: rotate({rotation}deg); transition: transform 0.1s ease;";
+    }
+
+    private string GetContentStyle()
+    {
+        if (_isPulling || _isRefreshing)
+        {
+            return $"transform: translateY({_pullDistance}px);";
+        }
+        return "";
+    }
+
+    public void Dispose()
+    {
+        _objRef?.Dispose();
+    }
+}
+
+
+
+
+
+
+

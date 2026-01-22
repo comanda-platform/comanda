@@ -1,0 +1,166 @@
+@page "/accounts"
+@attribute [Authorize]
+@using Comanda.Client.Admin.Models
+
+<PageTitle>Accounts - Comanda Admin</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Accounts</MudText>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+}
+else
+{
+    <MudPaper Elevation="2" Class="pa-4">
+        <div class="d-flex justify-space-between align-center mb-4">
+            <MudText Typo="Typo.h6">@_accounts.Count() Accounts Found</MudText>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenCreateDialog">
+                New Account
+            </MudButton>
+        </div>
+
+        @if (_accounts.Any())
+        {
+            <MudTable Items="@_accounts"
+                      Hover="true"
+                      Breakpoint="Breakpoint.Sm"
+                      Dense="false"
+                      Loading="@_isLoading"
+                      LoadingProgressColor="Color.Primary">
+                <HeaderContent>
+                    <MudTh>Account ID</MudTh>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Credit Line</MudTh>
+                    <MudTh>Credit Limit</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Account ID">
+                        @context.PublicId
+                    </MudTd>
+                    <MudTd DataLabel="Name">
+                        <strong>@context.Name</strong>
+                    </MudTd>
+                    <MudTd DataLabel="Credit Line">
+                        @if (context.HasCreditLine)
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small">Enabled</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Default" Size="Size.Small">Disabled</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Credit Limit">
+                        @if (context.CreditLimit.HasValue)
+                        {
+                            <MudText>@context.CreditLimit.Value.ToString("C")</MudText>
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Secondary">Unlimited</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Color="Color.Error"
+                                       Size="Size.Small"
+                                       OnClick="@(() => DeleteAccountAsync(context.PublicId, context.Name))" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info">
+                No accounts found.
+            </MudAlert>
+        }
+    </MudPaper>
+}
+
+@code {
+    [Inject] private AccountApiService AccountApiService { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+    [Inject] private IDialogService DialogService { get; set; } = default!;
+
+    private bool _isLoading = true;
+    private List<AccountResponse> _accounts = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAccountsAsync();
+    }
+
+    private async Task LoadAccountsAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _accounts = (await AccountApiService.GetAccountsAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading accounts: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { "Title", "Create New Account" }
+        };
+
+        var dialog = await DialogService.ShowAsync<CreateAccountDialog>("Create Account", parameters);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadAccountsAsync();
+        }
+    }
+
+    private async Task DeleteAccountAsync(string publicId, string accountName)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Message", $"Are you sure you want to delete account '{accountName}'? This action cannot be undone." },
+            { "ConfirmText", "Delete" },
+            { "CancelText", "Cancel" },
+            { "ConfirmColor", Color.Error }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete Account", parameters);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            try
+            {
+                var success = await AccountApiService.DeleteAccountAsync(publicId);
+                if (success)
+                {
+                    Snackbar.Add($"Account '{accountName}' deleted successfully", Severity.Success);
+                    await LoadAccountsAsync();
+                }
+                else
+                {
+                    Snackbar.Add("Failed to delete account", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting account: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

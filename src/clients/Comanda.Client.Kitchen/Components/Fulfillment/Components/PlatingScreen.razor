@@ -1,0 +1,89 @@
+@using Comanda.Client.Kitchen.Infrastructure.Localization
+
+<MudStack Spacing="4">
+    <MudText Typo="Typo.subtitle1">@L["ReviewPlating"]:</MudText>
+
+    <MudPaper Elevation="0" Class="pa-4" Style="background-color: var(--mud-palette-background-grey);">
+        <MudStack Spacing="3">
+            @* Container Type *@
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudIcon Icon="@GetContainerIcon(ContainerType)" Color="Color.Primary" Size="Size.Medium" />
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@L["Container"]</MudText>
+                    <MudText Typo="Typo.body1"><strong>@(ContainerType ?? L["Plate"])</strong></MudText>
+                </MudStack>
+            </MudStack>
+
+            <MudDivider />
+
+            @* Selected Sides *@
+            <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="2">
+                <MudIcon Icon="@Icons.Material.Filled.Restaurant" Color="Color.Secondary" Size="Size.Medium" />
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@L["Sides"]</MudText>
+                    @if (SelectedSides != null && SelectedSides.Any())
+                    {
+                        @foreach (var side in SelectedSides)
+                        {
+                            <MudText Typo="Typo.body2">• @side</MudText>
+                        }
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">@L["NoSides"]</MudText>
+                    }
+                </MudStack>
+            </MudStack>
+        </MudStack>
+    </MudPaper>
+
+    <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2">
+        <MudButton OnClick="HandleCancel" Variant="Variant.Outlined">
+            @L["Cancel"]
+        </MudButton>
+        <MudButton OnClick="HandleComplete"
+                   Variant="Variant.Filled"
+                   Color="Color.Success"
+                   StartIcon="@Icons.Material.Filled.Check">
+            @L["CompletePlating"]
+        </MudButton>
+    </MudStack>
+</MudStack>
+
+@code {
+    [Parameter, EditorRequired] public string OrderPublicId { get; set; } = default!;
+    [Parameter, EditorRequired] public string LinePublicId { get; set; } = default!;
+    [Parameter] public string? ContainerType { get; set; }
+    [Parameter] public IReadOnlyList<string>? SelectedSides { get; set; }
+    [Parameter] public EventCallback OnComplete { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    [Inject] private LocalizationService L { get; set; } = default!;
+
+    private string GetContainerIcon(string? containerType)
+    {
+        return containerType switch
+        {
+            "Plate" => Icons.Material.Filled.Dining,
+            "Delivery Container" => Icons.Material.Filled.LocalShipping,
+            _ => Icons.Material.Filled.Dining
+        };
+    }
+
+    private async Task HandleComplete()
+    {
+        await OnComplete.InvokeAsync();
+    }
+
+    private async Task HandleCancel()
+    {
+        await OnCancel.InvokeAsync();
+    }
+}
+
+
+
+
+
+
+

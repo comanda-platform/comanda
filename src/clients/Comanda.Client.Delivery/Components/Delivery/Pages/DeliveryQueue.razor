@@ -1,0 +1,796 @@
+@page "/"
+@page "/delivery"
+@implements IDisposable
+@using Comanda.Client.Delivery.Infrastructure.Localization
+@using Comanda.Shared.Enums
+
+
+
+<MudStack Spacing="4" Class="pt-4">
+
+    <!-- Header -->
+
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+
+        <MudText Typo="Typo.h4">@L["OrdersReadyForDelivery"]</MudText>
+
+
+
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+
+            <MudChip T="string" Color="Color.Primary" Size="Size.Small">
+
+                @DeliveryState.Orders.Count @L["Orders"]
+
+            </MudChip>
+
+
+
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+
+                           Color="Color.Primary"
+
+                           OnClick="RefreshOrders"
+
+                           Disabled="_isRefreshing" />
+
+        </MudStack>
+
+    </MudStack>
+
+
+
+    @if (_isRefreshing)
+
+    {
+
+        <MudProgressLinear Indeterminate Color="Color.Primary" />
+
+    }
+
+
+
+    <MudGrid>
+
+
+
+        <!-- Orders List -->
+        <MudItem xs="12">
+
+            @if (!DeliveryState.Orders.Any())
+
+            {
+
+                <MudAlert Severity="Severity.Info">
+
+                    <MudStack AlignItems="AlignItems.Center" Spacing="2">
+
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Large" />
+
+                        <MudText>@L["NoOrdersReady"]</MudText>
+
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+
+                            @L["OrdersWillAppear"]
+
+                        </MudText>
+
+                    </MudStack>
+
+                </MudAlert>
+
+            }
+
+            else
+
+            {
+
+                <MudStack Spacing="3">
+
+                    @foreach (var order in DeliveryState.Orders.OrderBy(o => o.CreatedAt))
+
+                    {
+
+                        <MudCard Elevation="2">
+
+                            <MudCardHeader>
+
+                                <CardHeaderContent>
+
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+
+                                        <MudStack Spacing="0">
+
+                                            <MudText Typo="Typo.subtitle1">
+
+                                                @L["Order"] #@order.OrderPublicId[..8]
+
+                                            </MudText>
+
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+
+                                                @order.TotalItems @L["Items"] – $@order.TotalAmount:F2
+
+                                            </MudText>
+
+                                        </MudStack>
+
+
+
+                                        <MudChip T="string"
+
+                                                 Color="GetStatusColor(order.Status)"
+
+                                                 Size="Size.Small">
+
+                                            @GetStatusText(order.Status)
+
+                                        </MudChip>
+
+                                    </MudStack>
+
+                                </CardHeaderContent>
+
+                            </MudCardHeader>
+
+
+
+                            <MudCardContent>
+
+                                <MudStack Spacing="2">
+
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+
+                                        <MudIcon Icon="@Icons.Material.Filled.LocationOn"
+
+                                                 Size="Size.Small"
+
+                                                 Color="Color.Secondary" />
+
+
+
+                                        <MudStack Spacing="0">
+
+                                            @if (!string.IsNullOrEmpty(order.LocationName))
+
+                                            {
+
+                                                <MudText Typo="Typo.body2">@order.LocationName</MudText>
+
+                                            }
+
+
+
+                                            @if (!string.IsNullOrEmpty(order.AddressLine))
+
+                                            {
+
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+
+                                                    @order.AddressLine
+
+                                                </MudText>
+
+                                            }
+
+
+
+                                            @if (string.IsNullOrEmpty(order.LocationName)
+
+                                            && string.IsNullOrEmpty(order.AddressLine))
+
+                                            {
+
+                                                <MudText Typo="Typo.body2" Color="Color.Secondary">
+
+                                                    @L["NoLocationSet"]
+
+                                                </MudText>
+
+                                            }
+
+                                        </MudStack>
+
+                                    </MudStack>
+
+                                </MudStack>
+
+                            </MudCardContent>
+
+
+
+                            <MudCardActions>
+
+                                @if (order.Status == OrderStatus.Ready)
+
+                                {
+
+                                    <MudButton Variant="Variant.Filled"
+
+                                               Color="Color.Primary"
+
+                                               StartIcon="@Icons.Material.Filled.DirectionsCar"
+
+                                               Disabled="_isProcessing"
+
+                                               OnClick="@(() => HandleStartDelivery(order.OrderPublicId))">
+
+                                        @L["StartDelivery"]
+
+                                    </MudButton>
+
+                                }
+
+                                else if (order.Status == OrderStatus.InTransit)
+
+                                {
+
+                                    <MudButton Variant="Variant.Filled"
+
+                                               Color="Color.Success"
+
+                                               StartIcon="@Icons.Material.Filled.CheckCircle"
+
+                                               Disabled="_isProcessing"
+
+                                               OnClick="@(() => HandleMarkDelivered(order.OrderPublicId))">
+
+                                        @L["MarkDelivered"]
+
+                                    </MudButton>
+
+                                }
+
+
+
+                                @if (order.HasCoordinates)
+
+                                {
+
+                                    <MudButton Variant="Variant.Text"
+
+                                               Color="Color.Primary"
+
+                                               StartIcon="@Icons.Material.Filled.Map"
+
+                                               OnClick="@(() => FocusOnOrder(order))">
+
+                                        @L["ViewOnMap"]
+
+                                    </MudButton>
+
+                                }
+
+                            </MudCardActions>
+
+                        </MudCard>
+
+                    }
+
+                </MudStack>
+
+            }
+
+        </MudItem>
+
+
+
+        <!-- Delivery Map -->
+        <MudItem xs="12">
+            <MudPaper Elevation="2" Style="overflow: hidden;">
+                <MudStack Spacing="0">
+                    <MudPaper Elevation="0" Class="pa-3" Style="background: var(--mud-palette-surface); border-bottom: 1px solid var(--mud-palette-divider);">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                            <MudIcon Icon="@Icons.Material.Filled.Map" Size="Size.Small" />
+                            <MudText Typo="Typo.subtitle1">@L["AllDeliveryLocations"]</MudText>
+                        </MudStack>
+                    </MudPaper>
+                    
+                    <div id="delivery-map"
+                         style="height: 500px;
+                                width: 100%;">
+                    </div>
+                </MudStack>
+            </MudPaper>
+
+        </MudItem>
+
+
+
+    </MudGrid>
+
+</MudStack>
+
+
+
+@code {
+
+    [Inject] private DeliveryStateService DeliveryState { get; set; } = default!;
+
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+
+    [Inject] private LocalizationService L { get; set; } = default!;
+
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+    [Inject] private IGeolocation Geolocation { get; set; } = default!;
+
+    private bool _isRefreshing;
+    private bool _isProcessing;
+    private bool _mapInitialized;
+    private string _lastMarkersHash = "";
+    private System.Threading.Timer? _locationTimer;
+    private bool _isTrackingLocation;
+
+
+
+    protected override void OnInitialized()
+
+    {
+
+        DeliveryState.OnStateChanged += HandleStateChanged;
+
+        L.OnLanguageChanged += HandleLanguageChanged;
+
+    }
+
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_mapInitialized)
+        {
+            // Add a small delay to ensure DOM is fully ready
+            await Task.Delay(200);
+            
+            // Initialize map regardless of whether there are orders
+            // This ensures the map container is ready for location tracking
+            if (DeliveryState.Orders.Any())
+            {
+                await InitializeMap();
+            }
+            else
+            {
+                // Initialize empty map at a default location
+                await InitializeEmptyMap();
+            }
+            
+            // Start location tracking after map is initialized
+            await StartLocationTracking();
+        }
+    }
+
+
+
+    private void HandleStateChanged()
+
+    {
+
+        InvokeAsync(async () =>
+
+        {
+
+            StateHasChanged();
+
+            await UpdateMapMarkers();
+
+        });
+
+    }
+
+
+
+    private void HandleLanguageChanged() => InvokeAsync(StateHasChanged);
+
+
+
+    private async Task RefreshOrders()
+
+    {
+
+        _isRefreshing = true;
+
+        StateHasChanged();
+
+
+
+        try
+
+        {
+
+            await DeliveryState.RefreshOrdersAsync();
+
+        }
+
+        catch (Exception ex)
+
+        {
+
+            Snackbar.Add($"{L["ErrorRefreshingOrders"]} {ex.Message}", Severity.Error);
+
+        }
+
+        finally
+
+        {
+
+            _isRefreshing = false;
+
+            StateHasChanged();
+
+        }
+
+    }
+
+
+
+    private async Task HandleStartDelivery(string orderPublicId)
+
+    {
+
+        _isProcessing = true;
+
+        StateHasChanged();
+
+
+
+        try
+
+        {
+
+            if (await DeliveryState.StartDeliveryAsync(orderPublicId))
+
+                Snackbar.Add(L["DeliveryStarted"], Severity.Success);
+
+            else
+
+                Snackbar.Add(L["FailedToStartDelivery"], Severity.Error);
+
+        }
+
+        finally
+
+        {
+
+            _isProcessing = false;
+
+            StateHasChanged();
+
+        }
+
+    }
+
+
+
+    private async Task HandleMarkDelivered(string orderPublicId)
+
+    {
+
+        _isProcessing = true;
+
+        StateHasChanged();
+
+
+
+        try
+
+        {
+
+            if (await DeliveryState.MarkDeliveredAsync(orderPublicId))
+
+                Snackbar.Add(L["OrderDelivered"], Severity.Success);
+
+            else
+
+                Snackbar.Add(L["FailedToMarkDelivered"], Severity.Error);
+
+        }
+
+        finally
+
+        {
+
+            _isProcessing = false;
+
+            StateHasChanged();
+
+        }
+
+    }
+
+
+
+    private async Task InitializeEmptyMap()
+    {
+        try
+        {
+            // Default center point (you can adjust to your business location)
+            var centerLat = 0.0;
+            var centerLng = 0.0;
+            
+            Console.WriteLine("Initializing empty map");
+
+            var result = await JS.InvokeAsync<bool>(
+                "initDeliveryMap",
+                "delivery-map",
+                centerLat,
+                centerLng,
+                Array.Empty<object>()
+            );
+
+            if (result)
+            {
+                _mapInitialized = true;
+                Console.WriteLine("Empty map initialized successfully");
+            }
+            else
+            {
+                Console.WriteLine("Empty map initialization returned false");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error initializing empty map: {ex.Message}");
+            Snackbar.Add($"Error initializing map: {ex.Message}", Severity.Warning);
+        }
+    }
+
+    private async Task InitializeMap()
+    {
+        try
+        {
+            var orders = DeliveryState.Orders.Where(o => o.HasCoordinates).ToList();
+            if (!orders.Any())
+            {
+                Console.WriteLine("No orders with coordinates to display on map");
+                return;
+            }
+
+            var centerLat = orders.Average(o => (double)o.Latitude!.Value);
+            var centerLng = orders.Average(o => (double)o.Longitude!.Value);
+
+            var markers = orders.Select(o => new
+            {
+                lat = (double)o.Latitude!.Value,
+                lng = (double)o.Longitude!.Value,
+                orderId = o.OrderPublicId,
+                items = o.TotalItems,
+                locationName = o.LocationName ?? "",
+                address = o.AddressLine ?? ""
+            }).ToArray();
+
+            Console.WriteLine($"Initializing map with {markers.Length} markers");
+
+            var result = await JS.InvokeAsync<bool>(
+                "initDeliveryMap",
+                "delivery-map",
+                centerLat,
+                centerLng,
+                markers
+            );
+
+            if (result)
+            {
+                _mapInitialized = true;
+                
+                // Store initial marker hash to prevent immediate re-update
+                _lastMarkersHash = string.Join("|", orders
+                    .OrderBy(o => o.OrderPublicId)
+                    .Select(o => $"{o.OrderPublicId}:{o.Latitude}:{o.Longitude}:{o.TotalItems}"));
+                
+                Console.WriteLine("Map initialized successfully");
+            }
+            else
+            {
+                Console.WriteLine("Map initialization returned false");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error initializing map: {ex.Message}");
+            Snackbar.Add($"Error initializing map: {ex.Message}", Severity.Warning);
+        }
+    }
+
+
+
+    private async Task UpdateMapMarkers()
+    {
+        if (!_mapInitialized)
+        {
+            return;
+        }
+
+        try
+        {
+            var ordersWithCoordinates = DeliveryState.Orders
+                .Where(o => o.HasCoordinates)
+                .ToList();
+
+            // Create a hash of current marker data to detect changes
+            var currentHash = string.Join("|", ordersWithCoordinates
+                .OrderBy(o => o.OrderPublicId)
+                .Select(o => $"{o.OrderPublicId}:{o.Latitude}:{o.Longitude}:{o.TotalItems}"));
+
+            // Only update if markers have actually changed
+            if (currentHash == _lastMarkersHash)
+            {
+                Console.WriteLine("Markers unchanged, skipping update");
+                return;
+            }
+
+            _lastMarkersHash = currentHash;
+            Console.WriteLine("Markers changed, updating map");
+
+            if (!ordersWithCoordinates.Any())
+            {
+                // Pass empty array explicitly
+                await JS.InvokeVoidAsync("updateDeliveryMarkers", Array.Empty<object>());
+                return;
+            }
+
+            var markers = ordersWithCoordinates
+                .Select(o => new
+                {
+                    lat = (double)o.Latitude!.Value,
+                    lng = (double)o.Longitude!.Value,
+                    orderId = o.OrderPublicId,
+                    items = o.TotalItems,
+                    locationName = o.LocationName ?? "",
+                    address = o.AddressLine ?? ""
+                })
+                .ToArray();
+
+            await JS.InvokeVoidAsync("updateDeliveryMarkers", markers);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating map markers: {ex.Message}");
+        }
+    }
+
+
+
+    private async Task FocusOnOrder(DeliveryOrderInfo order)
+
+    {
+
+        if (!order.HasCoordinates) return;
+
+
+
+        await JS.InvokeVoidAsync(
+
+            "focusOnLocation",
+
+            (double)order.Latitude!.Value,
+
+            (double)order.Longitude!.Value
+
+        );
+
+    }
+
+
+
+    private Color GetStatusColor(OrderStatus status) => status switch
+
+    {
+
+        OrderStatus.Ready => Color.Info,
+
+        OrderStatus.InTransit => Color.Warning,
+
+        OrderStatus.Delivered => Color.Success,
+
+        _ => Color.Default
+
+    };
+
+
+
+    private string GetStatusText(OrderStatus status) => status switch
+
+    {
+
+        OrderStatus.Ready => L["Ready"],
+
+        OrderStatus.InTransit => L["InTransit"],
+
+        OrderStatus.Delivered => L["Delivered"],
+
+        _ => L["Unknown"]
+
+    };
+
+
+
+    private async Task StartLocationTracking()
+    {
+        if (_isTrackingLocation) return;
+
+        try
+        {
+            // Skip location tracking on Windows if geolocation is not supported
+            if (DeviceInfo.Platform == DevicePlatform.WinUI)
+            {
+                Console.WriteLine("Location tracking skipped on Windows");
+                return;
+            }
+
+            // Request location permission
+            var status = await Permissions.CheckStatusAsync<Permissions.LocationWhenInUse>();
+            if (status != PermissionStatus.Granted)
+            {
+                status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
+            }
+
+            if (status != PermissionStatus.Granted)
+            {
+                Console.WriteLine("Location permission denied");
+                return;
+            }
+
+            _isTrackingLocation = true;
+            Console.WriteLine("Location tracking started");
+
+            // Update location immediately
+            await UpdateCurrentLocation();
+
+            // Set up timer to update location every 3 seconds
+            _locationTimer = new System.Threading.Timer(
+                async _ => await UpdateCurrentLocation(),
+                null,
+                TimeSpan.FromSeconds(1), // First update after 1 second
+                TimeSpan.FromSeconds(3)  // Then every 3 seconds
+            );
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error starting location tracking: {ex.Message}");
+        }
+    }
+
+    private async Task UpdateCurrentLocation()
+    {
+        if (!_mapInitialized) return;
+
+        try
+        {
+            var request = new GeolocationRequest(GeolocationAccuracy.Best, TimeSpan.FromSeconds(10));
+            var location = await Geolocation.GetLocationAsync(request);
+
+            if (location != null)
+            {
+                Console.WriteLine($"Location: {location.Latitude}, {location.Longitude}, Accuracy: {location.Accuracy}m");
+
+                await JS.InvokeVoidAsync(
+                    "updateCurrentLocation",
+                    location.Latitude,
+                    location.Longitude,
+                    location.Accuracy ?? 50.0
+                );
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error getting location: {ex.Message}");
+        }
+    }
+
+    public void Dispose()
+    {
+        _locationTimer?.Dispose();
+        _isTrackingLocation = false;
+        DeliveryState.OnStateChanged -= HandleStateChanged;
+        L.OnLanguageChanged -= HandleLanguageChanged;
+    }
+
+}
+
+
+
+
+
+
+
+

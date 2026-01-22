@@ -1,0 +1,299 @@
+@page "/orders"
+@attribute [Authorize]
+@using Comanda.Client.Admin.Models
+@using Comanda.Shared.Enums
+
+<PageTitle>Orders - Comanda Admin</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Orders</MudText>
+
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" sm="6" md="3">
+            <MudSelect T="OrderStatus?" Label="Status" @bind-Value="_filterStatus" Variant="Variant.Outlined" Clearable="true">
+                <MudSelectItem T="OrderStatus?" Value="null">All Statuses</MudSelectItem>
+                @foreach (OrderStatus status in Enum.GetValues(typeof(OrderStatus)))
+                {
+                    <MudSelectItem T="OrderStatus?" Value="@status">@status</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudSelect T="OrderFulfillmentType?" Label="Fulfillment Type" @bind-Value="_filterFulfillmentType" Variant="Variant.Outlined" Clearable="true">
+                <MudSelectItem T="OrderFulfillmentType?" Value="null">All Types</MudSelectItem>
+                @foreach (OrderFulfillmentType type in Enum.GetValues(typeof(OrderFulfillmentType)))
+                {
+                    <MudSelectItem T="OrderFulfillmentType?" Value="@type">@type</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudSelect T="OrderSource?" Label="Source" @bind-Value="_filterSource" Variant="Variant.Outlined" Clearable="true">
+                <MudSelectItem T="OrderSource?" Value="null">All Sources</MudSelectItem>
+                @foreach (OrderSource source in Enum.GetValues(typeof(OrderSource)))
+                {
+                    <MudSelectItem T="OrderSource?" Value="@source">@source</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudCheckBox @bind-Value="_filterActiveOnly" Label="Active Only" Color="Color.Primary" />
+        </MudItem>
+
+        <MudItem xs="12" sm="8">
+            <MudTextField @bind-Value="_searchText" Label="Search" Placeholder="Search by Order ID..." Variant="Variant.Outlined" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
+        </MudItem>
+
+        <MudItem xs="12" sm="4" Class="d-flex align-end">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ApplyFiltersAsync" FullWidth="true" StartIcon="@Icons.Material.Filled.FilterList">
+                Apply Filters
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+}
+else
+{
+    <MudPaper Elevation="2" Class="pa-4">
+        <div class="d-flex justify-space-between align-center mb-4">
+            <MudText Typo="Typo.h6">@_filteredOrders.Count() Orders Found</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Href="/orders/create">
+                New Order
+            </MudButton>
+        </div>
+
+        @if (_filteredOrders.Any())
+        {
+            <MudTable Items="@_filteredOrders" Hover="true" Breakpoint="Breakpoint.Sm" Dense="false" Loading="@_isLoading" LoadingProgressColor="Color.Primary">
+                <HeaderContent>
+                    <MudTh>Order ID</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Fulfillment</MudTh>
+                    <MudTh>Source</MudTh>
+                    <MudTh>Client</MudTh>
+                    <MudTh>Location</MudTh>
+                    <MudTh>Items</MudTh>
+                    <MudTh>Total</MudTh>
+                    <MudTh>Created</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Order ID">
+                        <MudLink Href="@($"/orders/{context.PublicId}")">@context.PublicId</MudLink>
+                    </MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">
+                            @context.Status
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Fulfillment">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary">
+                            @context.FulfillmentType
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Source">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text">
+                            @context.Source
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Client">
+                        @if (!string.IsNullOrEmpty(context.ClientPublicId))
+                        {
+                            <MudLink Href="@($"/clients/{context.ClientPublicId}")">
+                                @context.ClientPublicId
+                            </MudLink>
+                        }
+                        else if (!string.IsNullOrEmpty(context.ClientGroupPublicId))
+                        {
+                            <MudLink Href="@($"/client-groups/{context.ClientGroupPublicId}")">
+                                Group: @context.ClientGroupPublicId
+                            </MudLink>
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Secondary">-</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Location">
+                        @if (!string.IsNullOrEmpty(context.LocationPublicId))
+                        {
+                            <MudLink Href="@($"/locations/{context.LocationPublicId}")">
+                                @context.LocationPublicId
+                            </MudLink>
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Secondary">-</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Items">@context.TotalItems</MudTd>
+                    <MudTd DataLabel="Total">
+                        <strong>@context.TotalAmount.ToString("C")</strong>
+                    </MudTd>
+                    <MudTd DataLabel="Created">@context.CreatedAt.ToString("g")</MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small">
+                            <MudMenuItem Icon="@Icons.Material.Filled.Visibility" Href="@($"/orders/{context.PublicId}")">
+                                View Details
+                            </MudMenuItem>
+                            @if (context.Status == OrderStatus.Created)
+                            {
+                                <MudMenuItem Icon="@Icons.Material.Filled.CheckCircle" OnClick="@(() => UpdateOrderStatusAsync(context.PublicId, OrderStatus.Accepted))">
+                                    Accept Order
+                                </MudMenuItem>
+                            }
+                            @if (context.Status != OrderStatus.Cancelled && context.Status != OrderStatus.Delivered)
+                            {
+                                <MudMenuItem Icon="@Icons.Material.Filled.Cancel" OnClick="@(() => UpdateOrderStatusAsync(context.PublicId, OrderStatus.Cancelled))">
+                                    Cancel Order
+                                </MudMenuItem>
+                            }
+                        </MudMenu>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+                </PagerContent>
+            </MudTable>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info">
+                No orders found matching the current filters.
+            </MudAlert>
+        }
+    </MudPaper>
+}
+
+@code {
+    [Inject] private OrderApiService OrderApiService { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+
+    private bool _isLoading = true;
+    private List<OrderResponse> _allOrders = new();
+    private IEnumerable<OrderResponse> _filteredOrders = new List<OrderResponse>();
+
+    private OrderStatus? _filterStatus;
+    private OrderFulfillmentType? _filterFulfillmentType;
+    private OrderSource? _filterSource;
+    private bool _filterActiveOnly = false;
+    private string _searchText = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOrdersAsync();
+    }
+
+    private async Task LoadOrdersAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _allOrders = (await OrderApiService.GetOrdersAsync()).ToList();
+            ApplyFilters();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading orders: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ApplyFiltersAsync()
+    {
+        ApplyFilters();
+        await Task.CompletedTask;
+    }
+
+    private void ApplyFilters()
+    {
+        _filteredOrders = _allOrders.AsEnumerable();
+
+        if (_filterStatus.HasValue)
+        {
+            _filteredOrders = _filteredOrders.Where(o => o.Status == _filterStatus.Value);
+        }
+
+        if (_filterFulfillmentType.HasValue)
+        {
+            _filteredOrders = _filteredOrders.Where(o => o.FulfillmentType == _filterFulfillmentType.Value);
+        }
+
+        if (_filterSource.HasValue)
+        {
+            _filteredOrders = _filteredOrders.Where(o => o.Source == _filterSource.Value);
+        }
+
+        if (_filterActiveOnly)
+        {
+            _filteredOrders = _filteredOrders.Where(o => o.Status != OrderStatus.Delivered && o.Status != OrderStatus.Cancelled);
+        }
+
+        if (!string.IsNullOrWhiteSpace(_searchText))
+        {
+            var searchLower = _searchText.ToLower();
+            _filteredOrders = _filteredOrders.Where(o =>
+                o.PublicId.ToLower().Contains(searchLower) ||
+                (o.ClientPublicId?.ToLower().Contains(searchLower) ?? false) ||
+                (o.ClientGroupPublicId?.ToLower().Contains(searchLower) ?? false));
+        }
+
+        _filteredOrders = _filteredOrders.OrderByDescending(o => o.CreatedAt).ToList();
+    }
+
+    private async Task UpdateOrderStatusAsync(string publicId, OrderStatus newStatus)
+    {
+        try
+        {
+            var success = await OrderApiService.UpdateOrderStatusAsync(publicId, newStatus);
+            if (success)
+            {
+                Snackbar.Add($"Order {publicId} updated to {newStatus}", Severity.Success);
+                await LoadOrdersAsync();
+            }
+            else
+            {
+                Snackbar.Add("Failed to update order status", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error updating order: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private Color GetStatusColor(OrderStatus status)
+    {
+        return status switch
+        {
+            OrderStatus.Created => Color.Info,
+            OrderStatus.Accepted => Color.Primary,
+            OrderStatus.Preparing => Color.Warning,
+            OrderStatus.Ready => Color.Success,
+            OrderStatus.InTransit => Color.Secondary,
+            OrderStatus.Delivered => Color.Success,
+            OrderStatus.Cancelled => Color.Error,
+            _ => Color.Default
+        };
+    }
+}
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,226 @@
+@page "/"
+@attribute [Authorize]
+@using Comanda.Client.Admin.Models
+@using Comanda.Shared.Enums
+
+<PageTitle>Dashboard - Comanda Admin</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Dashboard</MudText>
+
+<AuthorizeView>
+    <Authorized>
+        <MudText Typo="Typo.h6" Class="mb-6">Welcome back, @context.User.Identity?.Name!</MudText>
+    </Authorized>
+</AuthorizeView>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+}
+else
+{
+    <MudGrid>
+        <!-- Stats Cards -->
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Color="Color.Primary">Today's Orders</MudText>
+                    <MudText Typo="Typo.h3">@_stats.TodayOrderCount</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Total: @_stats.TodayTotalAmount.ToString("C")
+                    </MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Color="Color.Warning">Active Orders</MudText>
+                    <MudText Typo="Typo.h3">@_stats.ActiveOrderCount</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">In progress</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Color="Color.Info">Pending Orders</MudText>
+                    <MudText Typo="Typo.h3">@_stats.PendingOrderCount</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Awaiting action</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="2">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Color="Color.Success">Completed Today</MudText>
+                    <MudText Typo="Typo.h3">@_stats.CompletedTodayCount</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Orders delivered</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <!-- Quick Actions -->
+        <MudItem xs="12">
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-3">Quick Actions</MudText>
+                <MudStack Row="true" Spacing="2">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               Href="/orders/create">
+                        New Order
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Secondary"
+                               StartIcon="@Icons.Material.Filled.List"
+                               Href="/orders">
+                        View All Orders
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.People"
+                               Href="/clients">
+                        Manage Clients
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Inventory"
+                               Href="/products">
+                        Manage Products
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        <!-- Recent Orders -->
+        <MudItem xs="12">
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-3">Recent Orders</MudText>
+                @if (_recentOrders.Any())
+                {
+                    <MudTable Items="@_recentOrders" Hover="true" Breakpoint="Breakpoint.Sm" Dense="true">
+                        <HeaderContent>
+                            <MudTh>Order ID</MudTh>
+                            <MudTh>Status</MudTh>
+                            <MudTh>Type</MudTh>
+                            <MudTh>Items</MudTh>
+                            <MudTh>Total</MudTh>
+                            <MudTh>Created</MudTh>
+                            <MudTh>Actions</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Order ID">@context.PublicId</MudTd>
+                            <MudTd DataLabel="Status">
+                                <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">
+                                    @context.Status
+                                </MudChip>
+                            </MudTd>
+                            <MudTd DataLabel="Type">
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
+                                    @context.FulfillmentType
+                                </MudChip>
+                            </MudTd>
+                            <MudTd DataLabel="Items">@context.TotalItems</MudTd>
+                            <MudTd DataLabel="Total">@context.TotalAmount.ToString("C")</MudTd>
+                            <MudTd DataLabel="Created">@context.CreatedAt.ToString("g")</MudTd>
+                            <MudTd DataLabel="Actions">
+                                <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                               Size="Size.Small"
+                                               Href="@($"/orders/{context.PublicId}")" />
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+                else
+                {
+                    <MudText Color="Color.Secondary">No recent orders found.</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Inject] private OrderApiService OrderApiService { get; set; } = default!;
+
+    private bool _isLoading = true;
+    private DashboardStats _stats = new();
+    private List<OrderResponse> _recentOrders = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboardDataAsync();
+    }
+
+    private async Task LoadDashboardDataAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            var allOrders = await OrderApiService.GetOrdersAsync();
+            var today = DateTime.Today;
+
+            _stats = new DashboardStats
+            {
+                TodayOrderCount = allOrders.Count(o => o.CreatedAt.Date == today),
+                TodayTotalAmount = allOrders.Where(o => o.CreatedAt.Date == today).Sum(o => o.TotalAmount),
+                ActiveOrderCount = allOrders.Count(o => o.Status != OrderStatus.Delivered &&
+                                                         o.Status != OrderStatus.Cancelled),
+                PendingOrderCount = allOrders.Count(o => o.Status == OrderStatus.Created),
+                CompletedTodayCount = allOrders.Count(o => o.Status == OrderStatus.Delivered &&
+                                                            o.CreatedAt.Date == today)
+            };
+
+            _recentOrders = allOrders
+                .OrderByDescending(o => o.CreatedAt)
+                .Take(10)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading dashboard data: {ex.Message}");
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private Color GetStatusColor(OrderStatus status)
+    {
+        return status switch
+        {
+            OrderStatus.Created => Color.Info,
+            OrderStatus.Accepted => Color.Primary,
+            OrderStatus.Preparing => Color.Warning,
+            OrderStatus.Ready => Color.Success,
+            OrderStatus.InTransit => Color.Secondary,
+            OrderStatus.Delivered => Color.Success,
+            OrderStatus.Cancelled => Color.Error,
+            _ => Color.Default
+        };
+    }
+
+    private class DashboardStats
+    {
+        public int TodayOrderCount { get; set; }
+        public decimal TodayTotalAmount { get; set; }
+        public int ActiveOrderCount { get; set; }
+        public int PendingOrderCount { get; set; }
+        public int CompletedTodayCount { get; set; }
+    }
+}
+
+
+
+
+
+
+
+
+
+

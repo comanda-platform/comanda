@@ -1,0 +1,36 @@
+@using Comanda.Shared.Enums
+
+<MudChip T="string" Size="@Size" Color="@GetStatusColor()" Variant="@Variant">
+    @Status
+</MudChip>
+
+@code {
+    [Parameter] public OrderStatus Status { get; set; }
+    [Parameter] public Size Size { get; set; } = Size.Medium;
+    [Parameter] public Variant Variant { get; set; } = Variant.Filled;
+
+    private Color GetStatusColor()
+    {
+        return Status switch
+        {
+            OrderStatus.Created => Color.Info,
+            OrderStatus.Accepted => Color.Primary,
+            OrderStatus.Preparing => Color.Warning,
+            OrderStatus.Ready => Color.Success,
+            OrderStatus.InTransit => Color.Secondary,
+            OrderStatus.Delivered => Color.Success,
+            OrderStatus.Cancelled => Color.Error,
+            _ => Color.Default
+        };
+    }
+}
+
+
+
+
+
+
+
+
+
+

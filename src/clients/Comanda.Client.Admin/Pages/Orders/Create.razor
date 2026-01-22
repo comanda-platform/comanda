@@ -1,0 +1,317 @@
+@page "/orders/create"
+@attribute [Authorize]
+@using Comanda.Client.Admin.Models
+@using Comanda.Shared.Enums
+
+<PageTitle>Create Order - Comanda Admin</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <div>
+        <MudText Typo="Typo.h4">Create New Order</MudText>
+        <MudBreadcrumbs Items="_breadcrumbs" Class="mt-2"></MudBreadcrumbs>
+    </div>
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/orders">
+        Back to Orders
+    </MudButton>
+</div>
+
+<EditForm Model="@_createModel" OnValidSubmit="HandleCreateOrderAsync">
+    <MudGrid>
+        <!-- Order Details Form -->
+        <MudItem xs="12" md="8">
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <MudText Typo="Typo.h6" Class="mb-3">Order Information</MudText>
+                <MudGrid>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="OrderFulfillmentType"
+                                   @bind-Value="_createModel.FulfillmentType"
+                                   Label="Fulfillment Type"
+                                   Variant="Variant.Outlined"
+                                   Required="true">
+                            @foreach (OrderFulfillmentType type in Enum.GetValues(typeof(OrderFulfillmentType)))
+                            {
+                                <MudSelectItem Value="@type">@type</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="OrderSource"
+                                   @bind-Value="_createModel.Source"
+                                   Label="Order Source"
+                                   Variant="Variant.Outlined"
+                                   Required="true">
+                            @foreach (OrderSource source in Enum.GetValues(typeof(OrderSource)))
+                            {
+                                <MudSelectItem Value="@source">@source</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_createModel.ClientPublicId"
+                                      Label="Client ID (Optional)"
+                                      Variant="Variant.Outlined"
+                                      Placeholder="Enter client public ID" />
+                    </MudItem>
+
+                    <MudItem xs="12" sm="6">
+                        <MudTextField @bind-Value="_createModel.ClientGroupPublicId"
+                                      Label="Client Group ID (Optional)"
+                                      Variant="Variant.Outlined"
+                                      Placeholder="Enter client group public ID" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_createModel.LocationPublicId"
+                                      Label="Location ID (Optional)"
+                                      Variant="Variant.Outlined"
+                                      Placeholder="Enter location public ID" />
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+
+            <!-- Order Lines -->
+            <MudPaper Elevation="2" Class="pa-4">
+                <div class="d-flex justify-space-between align-center mb-3">
+                    <MudText Typo="Typo.h6">Order Items</MudText>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               OnClick="AddOrderLine">
+                        Add Item
+                    </MudButton>
+                </div>
+
+                @if (_orderLines.Any())
+                {
+                    <MudTable Items="@_orderLines" Hover="true" Dense="true">
+                        <HeaderContent>
+                            <MudTh>Product ID</MudTh>
+                            <MudTh>Quantity</MudTh>
+                            <MudTh>Actions</MudTh>
+                        </HeaderContent>
+                        <RowTemplate Context="rowContext">
+                            <MudTd DataLabel="Product ID">@rowContext.ProductPublicId</MudTd>
+                            <MudTd DataLabel="Quantity">@rowContext.Quantity</MudTd>
+                            <MudTd DataLabel="Actions">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                               Size="Size.Small"
+                                               Color="Color.Error"
+                                               OnClick="@(() => RemoveOrderLine(rowContext))" />
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info">
+                        No items added yet. Click "Add Item" to add products to this order.
+                    </MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <!-- Order Summary & Actions -->
+        <MudItem xs="12" md="4">
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <MudText Typo="Typo.h6" Class="mb-3">Order Summary</MudText>
+                <MudStack Spacing="2">
+                    <div class="d-flex justify-space-between">
+                        <MudText>Total Items:</MudText>
+                        <MudText><strong>@_orderLines.Sum(l => l.Quantity)</strong></MudText>
+                    </div>
+                    <MudDivider />
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        Order total will be calculated by the server based on current product prices.
+                    </MudText>
+                </MudStack>
+            </MudPaper>
+
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-3">Actions</MudText>
+                <MudStack Spacing="2">
+                    <MudButton ButtonType="ButtonType.Submit"
+                               Variant="Variant.Filled"
+                               Color="Color.Success"
+                               FullWidth="true"
+                               StartIcon="@Icons.Material.Filled.Save"
+                               Disabled="@(_isSubmitting || !_orderLines.Any())">
+                        @if (_isSubmitting)
+                        {
+                            <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                            <span class="ms-2">Creating...</span>
+                        }
+                        else
+                        {
+                            <span>Create Order</span>
+                        }
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Default"
+                               FullWidth="true"
+                               StartIcon="@Icons.Material.Filled.Cancel"
+                               Href="/orders"
+                               Disabled="@_isSubmitting">
+                        Cancel
+                    </MudButton>
+                </MudStack>
+
+                @if (!_orderLines.Any())
+                {
+                    <MudAlert Severity="Severity.Warning" Class="mt-3">
+                        Add at least one item to create the order.
+                    </MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</EditForm>
+
+<!-- Add Order Line Dialog -->
+<MudDialog @bind-Visible="_showAddLineDialog">
+    <DialogContent>
+        <MudTextField @bind-Value="_newLine.ProductPublicId"
+                      Label="Product ID"
+                      Variant="Variant.Outlined"
+                      Required="true"
+                      Class="mb-3" />
+        <MudNumericField @bind-Value="_newLine.Quantity"
+                         Label="Quantity"
+                         Variant="Variant.Outlined"
+                         Min="1"
+                         Required="true" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showAddLineDialog = false)">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveOrderLine">Add</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Inject] private OrderApiService OrderApiService { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+    [Inject] private NavigationManager NavigationManager { get; set; } = default!;
+
+    private CreateOrderModel _createModel = new();
+    private List<OrderLineModel> _orderLines = new();
+    private bool _isSubmitting = false;
+    private bool _showAddLineDialog = false;
+    private OrderLineModel _newLine = new();
+
+    private List<BreadcrumbItem> _breadcrumbs = new()
+    {
+        new BreadcrumbItem("Home", href: "/"),
+        new BreadcrumbItem("Orders", href: "/orders"),
+        new BreadcrumbItem("Create", href: null, disabled: true)
+    };
+
+    private void AddOrderLine()
+    {
+        _newLine = new OrderLineModel();
+        _showAddLineDialog = true;
+    }
+
+    private void SaveOrderLine()
+    {
+        if (string.IsNullOrWhiteSpace(_newLine.ProductPublicId) || _newLine.Quantity < 1)
+        {
+            Snackbar.Add("Please enter a valid product ID and quantity", Severity.Warning);
+            return;
+        }
+
+        _orderLines.Add(_newLine);
+        _showAddLineDialog = false;
+        Snackbar.Add("Item added", Severity.Success);
+    }
+
+    private void RemoveOrderLine(OrderLineModel line)
+    {
+        _orderLines.Remove(line);
+        Snackbar.Add("Item removed", Severity.Info);
+    }
+
+    private async Task HandleCreateOrderAsync()
+    {
+        if (!_orderLines.Any())
+        {
+            Snackbar.Add("Please add at least one item to the order", Severity.Warning);
+            return;
+        }
+
+        _isSubmitting = true;
+        try
+        {
+            // Create the order first
+            var createRequest = new CreateOrderRequest(
+                _createModel.FulfillmentType,
+                _createModel.Source,
+                _createModel.ClientPublicId,
+                _createModel.ClientGroupPublicId,
+                _createModel.LocationPublicId
+            );
+
+            var createdOrder = await OrderApiService.CreateOrderAsync(createRequest);
+
+            if (createdOrder == null)
+            {
+                Snackbar.Add("Failed to create order", Severity.Error);
+                return;
+            }
+
+            // Add each line to the order
+            foreach (var line in _orderLines)
+            {
+                var lineRequest = new AddOrderLineRequest(
+                    line.ProductPublicId,
+                    line.Quantity,
+                    _createModel.ClientPublicId,
+                    null
+                );
+
+                var success = await OrderApiService.AddOrderLineAsync(createdOrder.PublicId, lineRequest);
+                if (!success)
+                {
+                    Snackbar.Add($"Warning: Failed to add item {line.ProductPublicId}", Severity.Warning);
+                }
+            }
+
+            Snackbar.Add($"Order {createdOrder.PublicId} created successfully", Severity.Success);
+            NavigationManager.NavigateTo($"/orders/{createdOrder.PublicId}");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error creating order: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private class CreateOrderModel
+    {
+        public OrderFulfillmentType FulfillmentType { get; set; } = OrderFulfillmentType.Delivery;
+        public OrderSource Source { get; set; } = OrderSource.Other;
+        public string? ClientPublicId { get; set; }
+        public string? ClientGroupPublicId { get; set; }
+        public string? LocationPublicId { get; set; }
+    }
+
+    private class OrderLineModel
+    {
+        public string ProductPublicId { get; set; } = string.Empty;
+        public int Quantity { get; set; } = 1;
+    }
+}
+
+
+
+
+
+
+
+
+
+

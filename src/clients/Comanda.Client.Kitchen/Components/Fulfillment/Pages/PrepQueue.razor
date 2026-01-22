@@ -1,0 +1,335 @@
+@page "/fulfillment"
+@implements IDisposable
+@using Comanda.Shared.Enums
+@using Comanda.Client.Kitchen.Infrastructure.Localization
+
+<PullToRefresh OnRefresh="RefreshOrders">
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+    <MudText Typo="Typo.h4">@L["FulfillmentQueue"]</MudText>
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+        <MudChip T="string" Color="Color.Primary" Size="Size.Small">
+            @FulfillmentState.Orders.Count @L["Orders"]
+        </MudChip>
+        <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                       Color="Color.Primary"
+                       OnClick="RefreshOrders"
+                       Disabled="_isRefreshing" />
+    </MudStack>
+</MudStack>
+
+@if (_isRefreshing)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+}
+
+@if (!FulfillmentState.Orders.Any())
+{
+    <MudAlert Severity="Severity.Info" Class="mt-4">
+        <MudStack AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Large" />
+            <MudText>@L["NoActiveOrders"]</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">@L["OrdersWillAppear"]</MudText>
+        </MudStack>
+    </MudAlert>
+}
+else
+{
+    <MudStack Spacing="4">
+        @foreach (var order in FulfillmentState.Orders.OrderBy(o => o.CreatedAt))
+        {
+            <MudCard Elevation="2">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                <MudText Typo="Typo.subtitle1">
+                                    @L["Order"] #@order.OrderPublicId[..8]
+                                </MudText>
+                                <FulfillmentTypeIcon FulfillmentType="@order.FulfillmentType" Size="Size.Small" />
+                                <StatusBadge OrderStatus="@order.ApiStatus" />
+                            </MudStack>
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudIcon Icon="@Icons.Material.Filled.AccessTime" Size="Size.Small" />
+                                <ElapsedTimer StartTime="@order.CreatedAt" WarningMinutes="15" CriticalMinutes="30" />
+                            </MudStack>
+                        </MudStack>
+                    </CardHeaderContent>
+                </MudCardHeader>
+
+                <MudCardContent>
+                    <MudStack Spacing="2">
+                        @foreach (var line in order.Lines)
+                        {
+                            <OrderLineCard OrderPublicId="@order.OrderPublicId"
+                                           Line="@line"
+                                           OrderStatus="@order.ApiStatus"
+                                           OnStartPrep="@(args => HandleStartPrep(args.OrderId, args.LineId))"
+                                           OnPlate="@(args => HandleOpenPlating(args.OrderId, args.LineId))" />
+                        }
+                    </MudStack>
+                </MudCardContent>
+
+                <MudCardActions>
+                    @switch (order.ApiStatus)
+                    {
+                        case OrderStatus.Created:
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Info"
+                                       StartIcon="@Icons.Material.Filled.ThumbUp"
+                                       OnClick="@(() => HandleAcceptOrder(order.OrderPublicId))"
+                                       Disabled="_isProcessing">
+                                @L["AcceptOrder"]
+                            </MudButton>
+                            break;
+
+                        case OrderStatus.Accepted:
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Warning"
+                                       StartIcon="@Icons.Material.Filled.Restaurant"
+                                       OnClick="@(() => HandleStartPreparing(order.OrderPublicId))"
+                                       Disabled="_isProcessing">
+                                @L["StartPreparing"]
+                            </MudButton>
+                            break;
+
+                        case OrderStatus.Preparing:
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Success"
+                                       StartIcon="@Icons.Material.Filled.CheckCircle"
+                                       OnClick="@(() => HandleMarkReady(order.OrderPublicId))"
+                                       Disabled="@(!FulfillmentState.AreAllLinesPlated(order.OrderPublicId) || _isProcessing)">
+                                @L["MarkReady"]
+                            </MudButton>
+                            @if (!FulfillmentState.AreAllLinesPlated(order.OrderPublicId))
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="ml-2">
+                                    @L["PlateAllItemsFirst"]
+                                </MudText>
+                            }
+                            break;
+                    }
+                </MudCardActions>
+            </MudCard>
+        }
+    </MudStack>
+}
+</PullToRefresh>
+
+<MudDialog @bind-Visible="_showPlatingDialog">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.Dining" Class="mr-2" />
+            @L["Plating"]
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_platingOrderId != null && _platingLineId != null)
+        {
+            <PlatingScreen OrderPublicId="@_platingOrderId"
+                           LinePublicId="@_platingLineId"
+                           ContainerType="@_platingContainerType"
+                           SelectedSides="@_platingSelectedSides"
+                           OnComplete="HandlePlatingComplete"
+                           OnCancel="HandlePlatingCancel" />
+        }
+    </DialogContent>
+</MudDialog>
+
+@code {
+    [Inject] private FulfillmentStateService FulfillmentState { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+    [Inject] private LocalizationService L { get; set; } = default!;
+
+    private bool _isRefreshing;
+    private bool _isProcessing;
+    private bool _showPlatingDialog;
+    private string? _platingOrderId;
+    private string? _platingLineId;
+    private string? _platingContainerType;
+    private IReadOnlyList<string>? _platingSelectedSides;
+
+    protected override void OnInitialized()
+    {
+        FulfillmentState.OnStateChanged += HandleStateChanged;
+        L.OnLanguageChanged += HandleLanguageChanged;
+    }
+
+    private void HandleStateChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+    
+    private void HandleLanguageChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task RefreshOrders()
+    {
+        _isRefreshing = true;
+        StateHasChanged();
+
+        try
+        {
+            await FulfillmentState.RefreshOrdersAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"{L["ErrorRefreshingOrders"]} {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isRefreshing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleAcceptOrder(string orderPublicId)
+    {
+        _isProcessing = true;
+        StateHasChanged();
+
+        try
+        {
+            var success = await FulfillmentState.AcceptOrderAsync(orderPublicId);
+
+            if (success)
+                Snackbar.Add(L["OrderAccepted"], Severity.Success);
+            else
+                Snackbar.Add(L["FailedToAcceptOrder"], Severity.Error);
+        }
+        finally
+        {
+            _isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleStartPreparing(string orderPublicId)
+    {
+        _isProcessing = true;
+        StateHasChanged();
+
+        try
+        {
+            var success = await FulfillmentState.StartPreparingOrderAsync(orderPublicId);
+
+            if (success)
+                Snackbar.Add(L["StartedPreparing"], Severity.Info);
+            else
+                Snackbar.Add(L["FailedToStartPreparing"], Severity.Error);
+        }
+        finally
+        {
+            _isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleMarkReady(string orderPublicId)
+    {
+        _isProcessing = true;
+        StateHasChanged();
+
+        try
+        {
+            var success = await FulfillmentState.MarkOrderReadyAsync(orderPublicId);
+
+            if (success)
+                Snackbar.Add(L["OrderReady"], Severity.Success);
+            else
+                Snackbar.Add(L["FailedToMarkReady"], Severity.Error);
+        }
+        finally
+        {
+            _isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleStartPrep(string orderPublicId, string linePublicId)
+    {
+        _isProcessing = true;
+        StateHasChanged();
+
+        try
+        {
+            var success = await FulfillmentState.StartPrepLineAsync(orderPublicId, linePublicId);
+
+            if (success)
+                Snackbar.Add(L["PrepStarted"], Severity.Info);
+            else
+                Snackbar.Add(L["FailedToStartPrep"], Severity.Error);
+        }
+        finally
+        {
+            _isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private void HandleOpenPlating(string orderPublicId, string linePublicId)
+    {
+        _platingOrderId = orderPublicId;
+        _platingLineId = linePublicId;
+
+        // Get line data to pass container type and sides to plating screen
+        var order = FulfillmentState.Orders.FirstOrDefault(o => o.OrderPublicId == orderPublicId);
+        var line = order?.Lines.FirstOrDefault(l => l.LinePublicId == linePublicId);
+        _platingContainerType = line?.ContainerType;
+        _platingSelectedSides = line?.SelectedSides;
+
+        _showPlatingDialog = true;
+    }
+
+    private async Task HandlePlatingComplete()
+    {
+        if (_platingOrderId != null && _platingLineId != null)
+        {
+            _isProcessing = true;
+            StateHasChanged();
+
+            try
+            {
+                var success = await FulfillmentState.CompleteLineAsync(_platingOrderId, _platingLineId);
+
+                if (success)
+                    Snackbar.Add(L["ItemPlated"], Severity.Success);
+                else
+                    Snackbar.Add(L["FailedToPlateItem"], Severity.Error);
+            }
+            finally
+            {
+                _isProcessing = false;
+            }
+        }
+
+        _showPlatingDialog = false;
+        _platingOrderId = null;
+        _platingLineId = null;
+        _platingContainerType = null;
+        _platingSelectedSides = null;
+    }
+
+    private void HandlePlatingCancel()
+    {
+        _showPlatingDialog = false;
+        _platingOrderId = null;
+        _platingLineId = null;
+        _platingContainerType = null;
+        _platingSelectedSides = null;
+    }
+
+    public void Dispose()
+    {
+        FulfillmentState.OnStateChanged -= HandleStateChanged;
+        L.OnLanguageChanged -= HandleLanguageChanged;
+    }
+}
+
+
+
+
+
+
+

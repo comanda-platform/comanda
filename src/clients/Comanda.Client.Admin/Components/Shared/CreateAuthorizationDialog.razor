@@ -1,0 +1,111 @@
+@using Comanda.Client.Admin.Models
+@using Comanda.Shared.Enums
+
+<MudDialog>
+    <DialogContent>
+        <MudSelect @bind-Value="_selectedPersonId"
+                   Label="Person"
+                   Variant="Variant.Outlined"
+                   Required="true"
+                   Class="mb-4">
+            @foreach (var person in _persons)
+            {
+                <MudSelectItem Value="@person.PublicId">@person.Name</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudSelect @bind-Value="_selectedAccountId"
+                   Label="Account"
+                   Variant="Variant.Outlined"
+                   Required="true"
+                   Class="mb-4">
+            @foreach (var account in _accounts)
+            {
+                <MudSelectItem Value="@account.PublicId">@account.Name</MudSelectItem>
+            }
+        </MudSelect>
+
+        <MudSelect @bind-Value="_selectedRole"
+                   Label="Role"
+                   Variant="Variant.Outlined"
+                   Required="true"
+                   Class="mb-4">
+            <MudSelectItem Value="@AuthorizationRole.Orderer">Orderer</MudSelectItem>
+            <MudSelectItem Value="@AuthorizationRole.Payer">Payer</MudSelectItem>
+            <MudSelectItem Value="@AuthorizationRole.Admin">Admin</MudSelectItem>
+            <MudSelectItem Value="@AuthorizationRole.Viewer">Viewer</MudSelectItem>
+        </MudSelect>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="CreateAsync"
+                   Disabled="@(string.IsNullOrEmpty(_selectedPersonId) || string.IsNullOrEmpty(_selectedAccountId))">
+            Create
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private MudBlazor.IDialogReference? MudDialog { get; set; }
+    [Inject] private AuthorizationApiService AuthorizationApiService { get; set; } = default!;
+    [Inject] private PersonApiService PersonApiService { get; set; } = default!;
+    [Inject] private AccountApiService AccountApiService { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+
+    [Parameter] public string Title { get; set; } = "Create Authorization";
+
+    private List<PersonResponse> _persons = new();
+    private List<AccountResponse> _accounts = new();
+    private string? _selectedPersonId;
+    private string? _selectedAccountId;
+    private AuthorizationRole _selectedRole = AuthorizationRole.Orderer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _persons = (await PersonApiService.GetPersonsAsync()).ToList();
+            _accounts = (await AccountApiService.GetAccountsAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading data: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void Cancel()
+    {
+        MudDialog?.Close(DialogResult.Cancel());
+    }
+
+    private async Task CreateAsync()
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(_selectedPersonId) || string.IsNullOrEmpty(_selectedAccountId))
+            {
+                Snackbar.Add("Please select both Person and Account", Severity.Warning);
+                return;
+            }
+
+            var request = new CreateAuthorizationRequest(_selectedPersonId, _selectedAccountId, _selectedRole);
+            var result = await AuthorizationApiService.CreateAuthorizationAsync(request);
+
+            if (result != null)
+            {
+                Snackbar.Add("Authorization created successfully", Severity.Success);
+                MudDialog?.Close(DialogResult.Ok(result));
+            }
+            else
+            {
+                Snackbar.Add("Failed to create authorization", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error creating authorization: {ex.Message}", Severity.Error);
+        }
+    }
+}

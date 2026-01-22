@@ -1,0 +1,196 @@
+@page "/clients/{publicId}/edit"
+@attribute [Authorize]
+@using Comanda.Client.Admin.Models
+@using System.ComponentModel.DataAnnotations
+
+<PageTitle>Edit Client - Comanda Admin</PageTitle>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+}
+else if (_client == null)
+{
+    <MudAlert Severity="Severity.Error">Client not found.</MudAlert>
+}
+else
+{
+    <div class="d-flex justify-space-between align-center mb-4">
+        <div>
+            <MudText Typo="Typo.h4">Edit Client: @_client.Name</MudText>
+            <MudBreadcrumbs Items="_breadcrumbs" Class="mt-2"></MudBreadcrumbs>
+        </div>
+        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="@($"/clients/{PublicId}")">
+            Back to Client
+        </MudButton>
+    </div>
+
+    <EditForm Model="@_editModel" OnValidSubmit="HandleUpdateClientAsync">
+        <DataAnnotationsValidator />
+
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                <MudPaper Elevation="2" Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">Client Information</MudText>
+                    <MudGrid>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_editModel.Name"
+                                          For="@(() => _editModel.Name)"
+                                          Label="Client Name"
+                                          Variant="Variant.Outlined"
+                                          Required="true"
+                                          HelperText="Enter the client's full name" />
+                        </MudItem>
+
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_editModel.ClientGroupPublicId"
+                                          Label="Client Group ID (Optional)"
+                                          Variant="Variant.Outlined"
+                                          Placeholder="Enter client group public ID"
+                                          HelperText="Leave blank if not assigning to a group" />
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            </MudItem>
+
+            <MudItem xs="12" md="4">
+                <MudPaper Elevation="2" Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">Actions</MudText>
+                    <MudStack Spacing="2">
+                        <MudButton ButtonType="ButtonType.Submit"
+                                   Variant="Variant.Filled"
+                                   Color="Color.Success"
+                                   FullWidth="true"
+                                   StartIcon="@Icons.Material.Filled.Save"
+                                   Disabled="@_isSubmitting">
+                            @if (_isSubmitting)
+                            {
+                                <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                                <span class="ms-2">Saving...</span>
+                            }
+                            else
+                            {
+                                <span>Save Changes</span>
+                            }
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Default"
+                                   FullWidth="true"
+                                   StartIcon="@Icons.Material.Filled.Cancel"
+                                   Href="@($"/clients/{PublicId}")"
+                                   Disabled="@_isSubmitting">
+                            Cancel
+                        </MudButton>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public string PublicId { get; set; } = string.Empty;
+    [Inject] private ClientApiService ClientApiService { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+    [Inject] private NavigationManager NavigationManager { get; set; } = default!;
+
+    private bool _isLoading = true;
+    private bool _isSubmitting = false;
+    private ClientResponse? _client;
+    private EditClientModel _editModel = new();
+
+    private List<BreadcrumbItem> _breadcrumbs = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _breadcrumbs = new List<BreadcrumbItem>
+        {
+            new BreadcrumbItem("Home", href: "/"),
+            new BreadcrumbItem("Clients", href: "/clients"),
+            new BreadcrumbItem(PublicId, href: $"/clients/{PublicId}"),
+            new BreadcrumbItem("Edit", href: null, disabled: true)
+        };
+
+        await LoadClientAsync();
+    }
+
+    private async Task LoadClientAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _client = await ClientApiService.GetClientByIdAsync(PublicId);
+            if (_client != null)
+            {
+                _editModel = new EditClientModel
+                {
+                    Name = _client.Name,
+                    ClientGroupPublicId = _client.ClientGroupPublicId
+                };
+            }
+            else
+            {
+                Snackbar.Add("Client not found", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading client: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task HandleUpdateClientAsync()
+    {
+        _isSubmitting = true;
+        try
+        {
+            var request = new UpdateClientRequest(
+                _editModel.Name,
+                string.IsNullOrWhiteSpace(_editModel.ClientGroupPublicId) ? null : _editModel.ClientGroupPublicId
+            );
+
+            var success = await ClientApiService.UpdateClientAsync(PublicId, request);
+
+            if (success)
+            {
+                Snackbar.Add("Client updated successfully", Severity.Success);
+                NavigationManager.NavigateTo($"/clients/{PublicId}");
+            }
+            else
+            {
+                Snackbar.Add("Failed to update client", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error updating client: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private class EditClientModel
+    {
+        [Required(ErrorMessage = "Client name is required")]
+        [StringLength(200, ErrorMessage = "Client name must be less than 200 characters")]
+        public string Name { get; set; } = string.Empty;
+
+        public string? ClientGroupPublicId { get; set; }
+    }
+}
+
+
+
+
+
+
+
+
+
+

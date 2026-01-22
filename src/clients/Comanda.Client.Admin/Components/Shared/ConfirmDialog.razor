@@ -1,0 +1,40 @@
+@using Microsoft.AspNetCore.Components
+
+<MudDialog>
+    <DialogContent>
+        <MudText>@Message</MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">@CancelText</MudButton>
+        <MudButton Color="@ConfirmColor" Variant="Variant.Filled" OnClick="Confirm">@ConfirmText</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private MudBlazor.IDialogReference? MudDialog { get; set; }
+
+    [Parameter] public string Message { get; set; } = "Are you sure you want to proceed?";
+    [Parameter] public string ConfirmText { get; set; } = "Confirm";
+    [Parameter] public string CancelText { get; set; } = "Cancel";
+    [Parameter] public Color ConfirmColor { get; set; } = Color.Primary;
+
+    private void Cancel()
+    {
+        MudDialog?.Close(DialogResult.Cancel());
+    }
+
+    private void Confirm()
+    {
+        MudDialog?.Close(DialogResult.Ok(true));
+    }
+}
+
+
+
+
+
+
+
+
+
+

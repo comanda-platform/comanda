@@ -1,0 +1,289 @@
+@page "/production"
+@implements IDisposable
+@using Comanda.Client.Kitchen.Infrastructure.Localization
+
+<PullToRefresh OnRefresh="LoadMenuAsync">
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4">
+    <MudText Typo="Typo.h4">@L["Production"]</MudText>
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+        <MudDatePicker @bind-Date="_selectedDate"
+                       Label="@L["Date"]"
+                       Variant="Variant.Outlined"
+                       Dense="true"
+                       DateFormat="ddd, MMM d"
+                       Style="max-width: 180px;" />
+        <MudIconButton Icon="@Icons.Material.Filled.Refresh"
+                       Color="Color.Primary"
+                       OnClick="LoadMenuAsync"
+                       Disabled="_isLoading" />
+    </MudStack>
+</MudStack>
+
+@if (_isLoading)
+{
+    <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Class="mt-8">
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+        <MudText Color="Color.Secondary">@L["LoadingMenu"]</MudText>
+    </MudStack>
+}
+else if (ProductionState.CurrentMenu == null || !ProductionState.CurrentMenu.Items.Any())
+{
+    <MudAlert Severity="Severity.Info" Class="mt-4">
+        @L["NoMenuItems"] @_selectedDate?.ToString("dddd, MMMM d").
+    </MudAlert>
+}
+else
+{
+    <MudGrid>
+        @foreach (var item in ProductionState.CurrentMenu.Items.OrderBy(i => i.SequenceOrder))
+        {
+            var availability = GetAvailabilityForProduct(item.ProductPublicId);
+            var batches = ProductionState.GetBatchesForProduct(item.ProductPublicId);
+            
+            <MudItem xs="12" sm="6" md="4" lg="3">
+                <ProductionItemCard MenuItem="@item"
+                                    Availability="@availability"
+                                    Batches="@batches"
+                                    OnStartCooking="HandleStartCooking"
+                                    OnMarkReady="HandleMarkReady"
+                                    OnViewRecipe="HandleViewRecipe" />
+            </MudItem>
+        }
+    </MudGrid>
+}
+</PullToRefresh>
+
+@* Recipe Dialog - fullscreen on small screens, larger on big screens *@
+<MudDialog @bind-Visible="_showRecipeDialog" Options="_recipeDialogOptions" Class="recipe-dialog">
+    <TitleContent>
+        <MudText Typo="Typo.h6">
+            <MudIcon Icon="@Icons.Material.Filled.MenuBook" Class="mr-2" />
+            @_currentRecipe?.Name
+        </MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (_currentRecipe != null)
+        {
+            <RecipeViewer Recipe="@_currentRecipe" />
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showRecipeDialog = false)">@L["Close"]</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* Yield Entry Dialog *@
+<MudDialog @bind-Visible="_showYieldDialog">
+    <TitleContent>
+        <MudText Typo="Typo.h6">@L["EnterYield"]</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText Class="mb-4">@L["HowManyPortions"]</MudText>
+        <MudNumericField @bind-Value="_yieldInput"
+                         Label="@L["Portions"]"
+                         Variant="Variant.Outlined"
+                         Min="1"
+                         Max="1000"
+                         Adornment="Adornment.Start"
+                         AdornmentIcon="@Icons.Material.Filled.Restaurant"
+                         HelperText="@L["PrefilledFromRecipe"]" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showYieldDialog = false)">@L["Cancel"]</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="ConfirmYield">
+            @L["MarkReady"]
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    /* Make recipe dialog fullscreen on smaller viewports */
+    @@media (max-width: 1920px) {
+        .recipe-dialog .mud-dialog {
+            max-width: 100vw !important;
+            max-height: 100vh !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+        }
+    }
+    
+    /* On large screens (1920px+), make dialog 50% larger than default */
+    @@media (min-width: 1921px) {
+        .recipe-dialog .mud-dialog {
+            max-width: 75vw !important;
+            min-width: 900px !important;
+        }
+    }
+</style>
+
+@code {
+    [Inject] private ProductionStateService ProductionState { get; set; } = default!;
+    [Inject] private AvailabilityStateService AvailabilityState { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+    [Inject] private LocalizationService L { get; set; } = default!;
+
+    private DateTime? _selectedDate = DateTime.Today;
+    private bool _isLoading;
+    private bool _showRecipeDialog;
+    private bool _showYieldDialog;
+    private RecipeResponse? _currentRecipe;
+    private string? _pendingCompleteBatchPublicId;
+    private string? _pendingCompleteProductId;
+    private int _yieldInput = 10;
+    
+    private static readonly DialogOptions _recipeDialogOptions = new()
+    {
+        CloseOnEscapeKey = true,
+        BackdropClick = true,
+        FullWidth = false,
+        MaxWidth = MaxWidth.Large
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        ProductionState.OnStateChanged += HandleStateChanged;
+        AvailabilityState.OnAvailabilityChanged += HandleAvailabilityChanged;
+        L.OnLanguageChanged += HandleLanguageChanged;
+        await LoadMenuAsync();
+    }
+
+    private void HandleStateChanged()
+    {
+        AvailabilityState.RecalculateAvailability();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void HandleAvailabilityChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+    
+    private void HandleLanguageChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LoadMenuAsync()
+    {
+        if (_selectedDate == null)
+            return;
+
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            await ProductionState.LoadMenuForDateAsync(DateOnly.FromDateTime(_selectedDate.Value));
+            AvailabilityState.RecalculateAvailability();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"{L["ErrorLoadingMenu"]} {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private AvailabilityInfo GetAvailabilityForProduct(string productPublicId)
+    {
+        var availability = AvailabilityState.GetAvailability(productPublicId);
+        if (availability != null)
+            return availability;
+
+        // Return default availability if not calculated yet
+        var menuItem = ProductionState.CurrentMenu?.Items
+            .FirstOrDefault(i => i.ProductPublicId == productPublicId);
+        
+        return new AvailabilityInfo(
+            productPublicId,
+            menuItem?.ProductName ?? "Unknown",
+            0,
+            0,
+            0,
+            AvailabilityLevel.SoldOut);
+    }
+
+    private async Task HandleStartCooking(string productPublicId)
+    {
+        var batchPublicId = await ProductionState.StartCookingAsync(productPublicId);
+        if (batchPublicId != null)
+        {
+            Snackbar.Add(L["StartedPreparing"], Severity.Info);
+        }
+        else
+        {
+            Snackbar.Add(L["FailedToStartBatch"], Severity.Error);
+        }
+    }
+
+    private async Task HandleMarkReady(string batchPublicId)
+    {
+        _pendingCompleteBatchPublicId = batchPublicId;
+
+        // Get the batch to find the product
+        var batch = ProductionState.GetBatchByPublicId(batchPublicId);
+        if (batch != null)
+        {
+            _pendingCompleteProductId = batch.ProductPublicId;
+
+            // Pre-fill with recipe's estimated portions if available
+            var recipe = await ProductionState.GetRecipeForProductAsync(batch.ProductPublicId);
+            _yieldInput = recipe?.EstimatedPortions ?? 10;
+        }
+
+        _showYieldDialog = true;
+    }
+
+    private async Task ConfirmYield()
+    {
+        if (!string.IsNullOrEmpty(_pendingCompleteBatchPublicId) && _yieldInput > 0)
+        {
+            var success = await ProductionState.CompleteCookingAsync(_pendingCompleteBatchPublicId, _yieldInput);
+            if (success)
+            {
+                Snackbar.Add($"{L["BatchComplete"]} {_yieldInput} {L["PortionsReady"]}.", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add(L["FailedToCompleteBatch"], Severity.Error);
+            }
+        }
+
+        _showYieldDialog = false;
+        _pendingCompleteBatchPublicId = null;
+        _pendingCompleteProductId = null;
+    }
+
+    private async Task HandleViewRecipe(string productPublicId)
+    {
+        _currentRecipe = await ProductionState.GetRecipeForProductAsync(productPublicId);
+
+        if (_currentRecipe != null)
+        {
+            _showRecipeDialog = true;
+        }
+        else
+        {
+            Snackbar.Add(L["NoRecipeFound"], Severity.Warning);
+        }
+    }
+
+    public void Dispose()
+    {
+        ProductionState.OnStateChanged -= HandleStateChanged;
+        AvailabilityState.OnAvailabilityChanged -= HandleAvailabilityChanged;
+        L.OnLanguageChanged -= HandleLanguageChanged;
+    }
+}
+
+
+
+
+
+
+

@@ -1,0 +1,347 @@
+@page "/clients/{publicId}"
+@attribute [Authorize]
+@using Comanda.Client.Admin.Models
+@using Comanda.Shared.Enums
+
+<PageTitle>Client Details - Comanda Admin</PageTitle>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+}
+else if (_client == null)
+{
+    <MudAlert Severity="Severity.Error">Client not found.</MudAlert>
+}
+else
+{
+    <div class="d-flex justify-space-between align-center mb-4">
+        <div>
+            <MudText Typo="Typo.h4">@_client.Name</MudText>
+            <MudBreadcrumbs Items="_breadcrumbs" Class="mt-2"></MudBreadcrumbs>
+        </div>
+        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/clients">
+            Back to Clients
+        </MudButton>
+    </div>
+
+    <MudGrid>
+        <!-- Client Information -->
+        <MudItem xs="12" md="8">
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <MudText Typo="Typo.h6" Class="mb-3">Client Information</MudText>
+                <MudGrid>
+                    <MudItem xs="12" sm="6">
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Public ID</MudText>
+                        <MudText Typo="Typo.body1">@_client.PublicId</MudText>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Name</MudText>
+                        <MudText Typo="Typo.h6">@_client.Name</MudText>
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Client Group</MudText>
+                        @if (!string.IsNullOrEmpty(_client.ClientGroupPublicId))
+                        {
+                            <MudLink Href="@($"/client-groups/{_client.ClientGroupPublicId}")">
+                                @_client.ClientGroupPublicId
+                            </MudLink>
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Secondary">Not assigned to any group</MudText>
+                        }
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+
+            <!-- Contacts -->
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <div class="d-flex justify-space-between align-center mb-3">
+                    <MudText Typo="Typo.h6">Contacts</MudText>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               OnClick="OpenAddContactDialog">
+                        Add Contact
+                    </MudButton>
+                </div>
+                @if (_client.Contacts.Any())
+                {
+                    <MudTable Items="@_client.Contacts" Hover="true" Dense="true">
+                        <HeaderContent>
+                            <MudTh>Type</MudTh>
+                            <MudTh>Value</MudTh>
+                            <MudTh>Actions</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Type">
+                                <MudChip T="string" Size="Size.Small">@context.Type</MudChip>
+                            </MudTd>
+                            <MudTd DataLabel="Value">@context.Value</MudTd>
+                            <MudTd DataLabel="Actions">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                               Size="Size.Small"
+                                               Color="Color.Error"
+                                               OnClick="@(() => RemoveContactAsync(context.PublicId))" />
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info">No contacts added yet.</MudAlert>
+                }
+            </MudPaper>
+
+            <!-- Locations -->
+            <MudPaper Elevation="2" Class="pa-4">
+                <div class="d-flex justify-space-between align-center mb-3">
+                    <MudText Typo="Typo.h6">Locations</MudText>
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               Size="Size.Small"
+                               StartIcon="@Icons.Material.Filled.Add"
+                               Href="@($"/locations/create?clientId={PublicId}")">
+                        Add Location
+                    </MudButton>
+                </div>
+                @if (_client.Locations.Any())
+                {
+                    <MudTable Items="@_client.Locations" Hover="true" Dense="true">
+                        <HeaderContent>
+                            <MudTh>Name</MudTh>
+                            <MudTh>Type</MudTh>
+                            <MudTh>Address</MudTh>
+                            <MudTh>Status</MudTh>
+                            <MudTh>Actions</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Name">
+                                <MudLink Href="@($"/locations/{context.PublicId}")">
+                                    @(context.Name ?? "Unnamed")
+                                </MudLink>
+                            </MudTd>
+                            <MudTd DataLabel="Type">
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@context.Type</MudChip>
+                            </MudTd>
+                            <MudTd DataLabel="Address">
+                                @if (!string.IsNullOrEmpty(context.AddressLine))
+                                {
+                                    <MudText>@context.AddressLine</MudText>
+                                }
+                                else if (context.HasCoordinates())
+                                {
+                                    <MudText>@context.Latitude, @context.Longitude</MudText>
+                                }
+                                else
+                                {
+                                    <MudText Color="Color.Secondary">No address</MudText>
+                                }
+                            </MudTd>
+                            <MudTd DataLabel="Status">
+                                <MudChip T="string" Size="Size.Small"
+                                         Color="@(context.IsActive ? Color.Success : Color.Default)">
+                                    @(context.IsActive ? "Active" : "Inactive")
+                                </MudChip>
+                            </MudTd>
+                            <MudTd DataLabel="Actions">
+                                <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                               Size="Size.Small"
+                                               Href="@($"/locations/{context.PublicId}")" />
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info">No locations added yet.</MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <!-- Actions -->
+        <MudItem xs="12" md="4">
+            <MudPaper Elevation="2" Class="pa-4 mb-4">
+                <MudText Typo="Typo.h6" Class="mb-3">Actions</MudText>
+                <MudStack Spacing="2">
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Edit"
+                               FullWidth="true"
+                               Href="@($"/clients/{PublicId}/edit")">
+                        Edit Client
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.ShoppingCart"
+                               FullWidth="true"
+                               Href="@($"/orders/create?clientId={PublicId}")">
+                        Create Order
+                    </MudButton>
+                    <MudDivider />
+                    <MudButton Variant="Variant.Text"
+                               StartIcon="@Icons.Material.Filled.Refresh"
+                               FullWidth="true"
+                               OnClick="LoadClientAsync">
+                        Refresh
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+
+            <!-- Related Orders -->
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-3">Quick Links</MudText>
+                <MudStack Spacing="2">
+                    <MudButton Variant="Variant.Text"
+                               StartIcon="@Icons.Material.Filled.Receipt"
+                               FullWidth="true"
+                               Href="@($"/orders?clientId={PublicId}")">
+                        View Orders
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+<!-- Add Contact Dialog -->
+<MudDialog @bind-Visible="_showAddContactDialog">
+    <DialogContent>
+        <MudSelect T="ClientContactType"
+                   @bind-Value="_newContactType"
+                   Label="Contact Type"
+                   Variant="Variant.Outlined"
+                   Class="mb-3">
+            @foreach (ClientContactType type in Enum.GetValues(typeof(ClientContactType)))
+            {
+                <MudSelectItem Value="@type">@type</MudSelectItem>
+            }
+        </MudSelect>
+        <MudTextField @bind-Value="_newContactValue"
+                      Label="Contact Value"
+                      Variant="Variant.Outlined"
+                      Placeholder="Enter phone number or WhatsApp" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showAddContactDialog = false)">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="AddContactAsync">Add</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public string PublicId { get; set; } = string.Empty;
+    [Inject] private ClientApiService ClientApiService { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+
+    private bool _isLoading = true;
+    private ClientResponse? _client;
+    private List<BreadcrumbItem> _breadcrumbs = new();
+
+    private bool _showAddContactDialog = false;
+    private ClientContactType _newContactType = ClientContactType.Phone;
+    private string _newContactValue = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _breadcrumbs = new List<BreadcrumbItem>
+        {
+            new BreadcrumbItem("Home", href: "/"),
+            new BreadcrumbItem("Clients", href: "/clients"),
+            new BreadcrumbItem(PublicId, href: null, disabled: true)
+        };
+
+        await LoadClientAsync();
+    }
+
+    private async Task LoadClientAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _client = await ClientApiService.GetClientByIdAsync(PublicId);
+            if (_client == null)
+            {
+                Snackbar.Add("Client not found", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading client: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private void OpenAddContactDialog()
+    {
+        _newContactType = ClientContactType.Phone;
+        _newContactValue = string.Empty;
+        _showAddContactDialog = true;
+    }
+
+    private async Task AddContactAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newContactValue))
+        {
+            Snackbar.Add("Please enter a contact value", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            var request = new AddClientContactRequest(_newContactType, _newContactValue);
+            var success = await ClientApiService.AddContactAsync(PublicId, request);
+
+            if (success)
+            {
+                Snackbar.Add("Contact added successfully", Severity.Success);
+                _showAddContactDialog = false;
+                await LoadClientAsync();
+            }
+            else
+            {
+                Snackbar.Add("Failed to add contact", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error adding contact: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task RemoveContactAsync(string contactPublicId)
+    {
+        try
+        {
+            var success = await ClientApiService.RemoveContactAsync(PublicId, contactPublicId);
+
+            if (success)
+            {
+                Snackbar.Add("Contact removed successfully", Severity.Success);
+                await LoadClientAsync();
+            }
+            else
+            {
+                Snackbar.Add("Failed to remove contact", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error removing contact: {ex.Message}", Severity.Error);
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+

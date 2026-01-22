@@ -1,0 +1,194 @@
+@implements IDisposable
+
+<MudStack Spacing="4">
+    @* Critical/Sold Out Items First *@
+    @if (_criticalItems.Any() || _soldOutItems.Any())
+    {
+        <MudPaper Elevation="1" Class="pa-4" Style="border-left: 4px solid var(--mud-palette-error);">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Error" />
+                <MudText Typo="Typo.h6" Color="Color.Error">Needs Attention</MudText>
+            </MudStack>
+
+            <MudSimpleTable Dense="true" Hover="true">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th style="text-align: center;">Produced</th>
+                        <th style="text-align: center;">Committed</th>
+                        <th style="text-align: center;">Remaining</th>
+                        <th style="text-align: center;">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in _soldOutItems)
+                    {
+                        <tr style="background-color: rgba(244, 67, 54, 0.1);">
+                            <td><strong>@item.ProductName</strong></td>
+                            <td style="text-align: center;">@item.Produced</td>
+                            <td style="text-align: center;">@item.Committed</td>
+                            <td style="text-align: center;">@item.Remaining</td>
+                            <td style="text-align: center;">
+                                <AvailabilityBadge Level="@item.Level" Remaining="@item.Remaining" ShowCount="false" />
+                            </td>
+                        </tr>
+                    }
+                    @foreach (var item in _criticalItems)
+                    {
+                        <tr style="background-color: rgba(244, 67, 54, 0.05);">
+                            <td>@item.ProductName</td>
+                            <td style="text-align: center;">@item.Produced</td>
+                            <td style="text-align: center;">@item.Committed</td>
+                            <td style="text-align: center;">@item.Remaining</td>
+                            <td style="text-align: center;">
+                                <AvailabilityBadge Level="@item.Level" Remaining="@item.Remaining" />
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        </MudPaper>
+    }
+
+    @* Low Stock Items *@
+    @if (_lowItems.Any())
+    {
+        <MudPaper Elevation="1" Class="pa-4" Style="border-left: 4px solid var(--mud-palette-warning);">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.Info" Color="Color.Warning" />
+                <MudText Typo="Typo.h6" Color="Color.Warning">Low Stock</MudText>
+            </MudStack>
+
+            <MudSimpleTable Dense="true" Hover="true">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th style="text-align: center;">Produced</th>
+                        <th style="text-align: center;">Committed</th>
+                        <th style="text-align: center;">Remaining</th>
+                        <th style="text-align: center;">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in _lowItems)
+                    {
+                        <tr>
+                            <td>@item.ProductName</td>
+                            <td style="text-align: center;">@item.Produced</td>
+                            <td style="text-align: center;">@item.Committed</td>
+                            <td style="text-align: center;">@item.Remaining</td>
+                            <td style="text-align: center;">
+                                <AvailabilityBadge Level="@item.Level" Remaining="@item.Remaining" />
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        </MudPaper>
+    }
+
+    @* Good Stock Items *@
+    @if (_goodItems.Any())
+    {
+        <MudPaper Elevation="1" Class="pa-4" Style="border-left: 4px solid var(--mud-palette-success);">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-3">
+                <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" />
+                <MudText Typo="Typo.h6" Color="Color.Success">Good Stock</MudText>
+            </MudStack>
+
+            <MudSimpleTable Dense="true" Hover="true">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th style="text-align: center;">Produced</th>
+                        <th style="text-align: center;">Committed</th>
+                        <th style="text-align: center;">Remaining</th>
+                        <th style="text-align: center;">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in _goodItems)
+                    {
+                        <tr>
+                            <td>@item.ProductName</td>
+                            <td style="text-align: center;">@item.Produced</td>
+                            <td style="text-align: center;">@item.Committed</td>
+                            <td style="text-align: center;">@item.Remaining</td>
+                            <td style="text-align: center;">
+                                <AvailabilityBadge Level="@item.Level" Remaining="@item.Remaining" />
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        </MudPaper>
+    }
+
+    @* Summary *@
+    <MudPaper Elevation="0" Class="pa-4">
+        <MudStack Row="true" Justify="Justify.SpaceAround">
+            <MudStack AlignItems="AlignItems.Center">
+                <MudText Typo="Typo.h4" Color="Color.Success">@_goodItems.Count()</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Good Stock</MudText>
+            </MudStack>
+            <MudStack AlignItems="AlignItems.Center">
+                <MudText Typo="Typo.h4" Color="Color.Warning">@_lowItems.Count()</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Low Stock</MudText>
+            </MudStack>
+            <MudStack AlignItems="AlignItems.Center">
+                <MudText Typo="Typo.h4" Color="Color.Error">@_criticalItems.Count()</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Critical</MudText>
+            </MudStack>
+            <MudStack AlignItems="AlignItems.Center">
+                <MudText Typo="Typo.h4" Color="Color.Dark">@_soldOutItems.Count()</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">Sold Out</MudText>
+            </MudStack>
+        </MudStack>
+    </MudPaper>
+</MudStack>
+
+@code {
+    [Inject] private AvailabilityStateService AvailabilityState { get; set; } = default!;
+
+    private IEnumerable<AvailabilityInfo> _soldOutItems = [];
+    private IEnumerable<AvailabilityInfo> _criticalItems = [];
+    private IEnumerable<AvailabilityInfo> _lowItems = [];
+    private IEnumerable<AvailabilityInfo> _goodItems = [];
+
+    protected override void OnInitialized()
+    {
+        AvailabilityState.OnAvailabilityChanged += HandleAvailabilityChanged;
+        CategorizeItems();
+    }
+
+    private void HandleAvailabilityChanged()
+    {
+        InvokeAsync(() =>
+        {
+            CategorizeItems();
+            StateHasChanged();
+        });
+    }
+
+    private void CategorizeItems()
+    {
+        var items = AvailabilityState.Availability.Values.OrderBy(i => i.ProductName);
+
+        _soldOutItems = items.Where(i => i.Level == AvailabilityLevel.SoldOut);
+        _criticalItems = items.Where(i => i.Level == AvailabilityLevel.Critical);
+        _lowItems = items.Where(i => i.Level == AvailabilityLevel.Low);
+        _goodItems = items.Where(i => i.Level == AvailabilityLevel.Good);
+    }
+
+    public void Dispose()
+    {
+        AvailabilityState.OnAvailabilityChanged -= HandleAvailabilityChanged;
+    }
+}
+
+
+
+
+
+
+

@@ -1,0 +1,103 @@
+@page "/"
+
+<MudText Typo="Typo.h4" Class="mb-4">Kitchen Dashboard</MudText>
+
+<MudGrid>
+    <MudItem xs="12" sm="6" md="4">
+        <MudCard Elevation="2" Class="pa-4 cursor-pointer" @onclick="@(() => Navigation.NavigateTo("/production"))">
+            <MudStack AlignItems="AlignItems.Center" Spacing="2">
+                <MudIcon Icon="@Icons.Material.Filled.LocalFireDepartment" Size="Size.Large" Color="Color.Warning" />
+                <MudText Typo="Typo.h6">Production</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Batch cooking for today's menu</MudText>
+            </MudStack>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="4">
+        <MudCard Elevation="2" Class="pa-4 cursor-pointer" @onclick="@(() => Navigation.NavigateTo("/fulfillment"))">
+            <MudStack AlignItems="AlignItems.Center" Spacing="2">
+                <MudBadge Content="@_activeOrdersCount" Color="Color.Primary" Overlap="true" Visible="@(_activeOrdersCount > 0)">
+                    <MudIcon Icon="@Icons.Material.Filled.RoomService" Size="Size.Large" Color="Color.Info" />
+                </MudBadge>
+                <MudText Typo="Typo.h6">Fulfillment</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Active orders to prepare</MudText>
+            </MudStack>
+        </MudCard>
+    </MudItem>
+
+    <MudItem xs="12" sm="6" md="4">
+        <MudCard Elevation="2" Class="pa-4 cursor-pointer" @onclick="@(() => Navigation.NavigateTo("/availability"))">
+            <MudStack AlignItems="AlignItems.Center" Spacing="2">
+                <MudIcon Icon="@Icons.Material.Filled.Inventory" Size="Size.Large" Color="Color.Success" />
+                <MudText Typo="Typo.h6">Availability</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Current inventory status</MudText>
+            </MudStack>
+        </MudCard>
+    </MudItem>
+</MudGrid>
+
+@if (_lowAvailabilityItems.Any())
+{
+    <MudPaper Elevation="1" Class="pa-4 mt-6">
+        <MudText Typo="Typo.h6" Class="mb-2">
+            <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Class="mr-1" />
+            Low Availability Items
+        </MudText>
+        <MudStack Spacing="1">
+            @foreach (var item in _lowAvailabilityItems)
+            {
+                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                    <MudText>@item.ProductName</MudText>
+                    <AvailabilityBadge Level="@item.Level" Remaining="@item.Remaining" />
+                </MudStack>
+            }
+        </MudStack>
+    </MudPaper>
+}
+
+@code {
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private FulfillmentStateService FulfillmentState { get; set; } = default!;
+    [Inject] private AvailabilityStateService AvailabilityState { get; set; } = default!;
+
+    private int _activeOrdersCount;
+    private IEnumerable<AvailabilityInfo> _lowAvailabilityItems = [];
+
+    protected override void OnInitialized()
+    {
+        FulfillmentState.OnStateChanged += HandleStateChanged;
+        AvailabilityState.OnAvailabilityChanged += HandleStateChanged;
+        UpdateCounts();
+    }
+
+    private void HandleStateChanged()
+    {
+        InvokeAsync(() =>
+        {
+            UpdateCounts();
+            StateHasChanged();
+        });
+    }
+
+    private void UpdateCounts()
+    {
+        _activeOrdersCount = FulfillmentState.Orders.Count;
+        _lowAvailabilityItems = AvailabilityState.Availability.Values
+            .Where(a => a.Level != AvailabilityLevel.Good)
+            .OrderBy(a => a.Level)
+            .Take(5);
+    }
+
+    public void Dispose()
+    {
+        FulfillmentState.OnStateChanged -= HandleStateChanged;
+        AvailabilityState.OnAvailabilityChanged -= HandleStateChanged;
+    }
+}
+
+
+
+
+
+
+

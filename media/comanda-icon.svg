@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="brandGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B35"/>
+      <stop offset="100%" style="stop-color:#E84118"/>
+    </linearGradient>
+    <linearGradient id="signalGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#FF6B35;stop-opacity:0.9"/>
+      <stop offset="100%" style="stop-color:#E84118;stop-opacity:0.5"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Order ticket / receipt shape -->
+  <g transform="translate(15, 12)">
+    <!-- Main ticket body -->
+    <rect x="0" y="0" width="52" height="70" rx="5" fill="url(#brandGradient)"/>
+    
+    <!-- Perforated edge at top -->
+    <path d="M0 10 L5 5 L10 10 L15 5 L20 10 L25 5 L30 10 L35 5 L40 10 L45 5 L50 10 L52 8 L52 0 L0 0 Z" fill="url(#brandGradient)"/>
+    
+    <!-- Order lines on ticket -->
+    <rect x="8" y="22" width="28" height="4" rx="2" fill="white" opacity="0.9"/>
+    <rect x="8" y="32" width="36" height="4" rx="2" fill="white" opacity="0.7"/>
+    <rect x="8" y="42" width="20" height="4" rx="2" fill="white" opacity="0.6"/>
+    
+    <!-- Checkmark circle -->
+    <circle cx="38" cy="58" r="9" fill="white" opacity="0.95"/>
+    <path d="M32 58 L36 62 L44 53" stroke="#E84118" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  
+  <!-- Signal waves -->
+  <g transform="translate(52, 22)">
+    <path d="M12 22 Q20 14 28 22" stroke="url(#signalGradient)" stroke-width="4" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M6 14 Q20 2 34 14" stroke="url(#signalGradient)" stroke-width="4" fill="none" stroke-linecap="round" opacity="0.7"/>
+    <path d="M0 6 Q20 -10 40 6" stroke="url(#signalGradient)" stroke-width="4" fill="none" stroke-linecap="round" opacity="0.9"/>
+  </g>
+</svg>

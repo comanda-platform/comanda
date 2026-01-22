@@ -1,0 +1,319 @@
+@page "/products"
+@attribute [Authorize]
+@using Comanda.Client.Admin.Models
+
+<PageTitle>Products - Comanda Admin</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Products</MudText>
+
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" sm="4">
+            <MudSelect T="string"
+                       @bind-Value="_filterProductTypeId"
+                       Label="Product Type"
+                       Variant="Variant.Outlined"
+                       Clearable="true">
+                <MudSelectItem T="string" Value="@(null)">All Types</MudSelectItem>
+                @foreach (var type in _productTypes)
+                {
+                    <MudSelectItem Value="@type.PublicId">@type.Name</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+
+        <MudItem xs="12" sm="6">
+            <MudTextField @bind-Value="_searchText"
+                          Label="Search"
+                          Placeholder="Search by product name..."
+                          Variant="Variant.Outlined"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search" />
+        </MudItem>
+
+        <MudItem xs="12" sm="2" Class="d-flex align-end">
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       OnClick="ApplyFiltersAsync"
+                       FullWidth="true"
+                       StartIcon="@Icons.Material.Filled.FilterList">
+                Apply
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+}
+else
+{
+    <MudPaper Elevation="2" Class="pa-4">
+        <div class="d-flex justify-space-between align-center mb-4">
+            <MudText Typo="Typo.h6">@_filteredProducts.Count() Products Found</MudText>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       Href="/products/create">
+                New Product
+            </MudButton>
+        </div>
+
+        @if (_filteredProducts.Any())
+        {
+            <MudTable Items="@_filteredProducts"
+                      Hover="true"
+                      Breakpoint="Breakpoint.Sm"
+                      Dense="false"
+                      Loading="@_isLoading"
+                      LoadingProgressColor="Color.Primary">
+                <HeaderContent>
+                    <MudTh>Product ID</MudTh>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Type</MudTh>
+                    <MudTh>Current Price</MudTh>
+                    <MudTh>Description</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Product ID">
+                        <MudLink Href="@($"/products/{context.PublicId}")">
+                            @context.PublicId
+                        </MudLink>
+                    </MudTd>
+                    <MudTd DataLabel="Name">
+                        <strong>@context.Name</strong>
+                    </MudTd>
+                    <MudTd DataLabel="Type">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary">
+                            @context.Type.Name
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Current Price">
+                        <MudText Typo="Typo.body1" Color="Color.Success">
+                            <strong>@context.CurrentPrice.ToString("C")</strong>
+                        </MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Description">
+                        @if (!string.IsNullOrEmpty(context.Description))
+                        {
+                            <MudText>@(context.Description.Length > 50 ? context.Description.Substring(0, 50) + "..." : context.Description)</MudText>
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Secondary">-</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small">
+                            <MudMenuItem Icon="@Icons.Material.Filled.Visibility"
+                                         Href="@($"/products/{context.PublicId}")">
+                                View Details
+                            </MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.Edit"
+                                         Href="@($"/products/{context.PublicId}/edit")">
+                                Edit Product
+                            </MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.AttachMoney"
+                                         OnClick="@(() => OpenUpdatePriceDialog(context))">
+                                Update Price
+                            </MudMenuItem>
+                            <MudMenuItem Icon="@Icons.Material.Filled.Delete"
+                                         OnClick="@(() => DeleteProductAsync(context.PublicId, context.Name))">
+                                Delete Product
+                            </MudMenuItem>
+                        </MudMenu>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+                </PagerContent>
+            </MudTable>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info">
+                No products found matching the current filters.
+            </MudAlert>
+        }
+    </MudPaper>
+}
+
+<!-- Update Price Dialog -->
+<MudDialog @bind-Visible="_showUpdatePriceDialog">
+    <DialogContent>
+        @if (_selectedProduct != null)
+        {
+            <MudText Typo="Typo.h6" Class="mb-3">Update Price for @_selectedProduct.Name</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                Current Price: @_selectedProduct.CurrentPrice.ToString("C")
+            </MudText>
+            <MudNumericField @bind-Value="_newPrice"
+                             Label="New Price"
+                             Variant="Variant.Outlined"
+                             Format="C2"
+                             Min="0.01m"
+                             Step="0.01m"
+                             Required="true" />
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showUpdatePriceDialog = false)">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="UpdateProductPriceAsync">Update</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Inject] private ProductApiService ProductApiService { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+    [Inject] private IDialogService DialogService { get; set; } = default!;
+
+    private bool _isLoading = true;
+    private List<ProductResponse> _allProducts = new();
+    private IEnumerable<ProductResponse> _filteredProducts = new List<ProductResponse>();
+    private List<ProductTypeResponse> _productTypes = new();
+    private string? _filterProductTypeId;
+    private string _searchText = string.Empty;
+
+    private bool _showUpdatePriceDialog = false;
+    private ProductResponse? _selectedProduct;
+    private decimal _newPrice;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            var productsTask = ProductApiService.GetProductsAsync();
+            var typesTask = ProductApiService.GetProductTypesAsync();
+
+            await Task.WhenAll(productsTask, typesTask);
+
+            _allProducts = (await productsTask).ToList();
+            _productTypes = (await typesTask).ToList();
+
+            ApplyFilters();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading data: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ApplyFiltersAsync()
+    {
+        ApplyFilters();
+        await Task.CompletedTask;
+    }
+
+    private void ApplyFilters()
+    {
+        _filteredProducts = _allProducts.AsEnumerable();
+
+        if (!string.IsNullOrEmpty(_filterProductTypeId))
+        {
+            _filteredProducts = _filteredProducts.Where(p => p.Type.PublicId == _filterProductTypeId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(_searchText))
+        {
+            var searchLower = _searchText.ToLower();
+            _filteredProducts = _filteredProducts.Where(p =>
+                p.Name.ToLower().Contains(searchLower) ||
+                p.PublicId.ToLower().Contains(searchLower));
+        }
+
+        _filteredProducts = _filteredProducts.OrderBy(p => p.Name).ToList();
+    }
+
+    private void OpenUpdatePriceDialog(ProductResponse product)
+    {
+        _selectedProduct = product;
+        _newPrice = product.CurrentPrice;
+        _showUpdatePriceDialog = true;
+    }
+
+    private async Task UpdateProductPriceAsync()
+    {
+        if (_selectedProduct == null || _newPrice <= 0)
+        {
+            Snackbar.Add("Please enter a valid price", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            var success = await ProductApiService.UpdateProductPriceAsync(_selectedProduct.PublicId, _newPrice);
+
+            if (success)
+            {
+                Snackbar.Add($"Price updated successfully", Severity.Success);
+                _showUpdatePriceDialog = false;
+                await LoadDataAsync();
+            }
+            else
+            {
+                Snackbar.Add("Failed to update price", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error updating price: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task DeleteProductAsync(string publicId, string productName)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Message", $"Are you sure you want to delete product '{productName}'? This action cannot be undone." },
+            { "ConfirmText", "Delete" },
+            { "CancelText", "Cancel" },
+            { "ConfirmColor", Color.Error }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete Product", parameters);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            try
+            {
+                var success = await ProductApiService.DeleteProductAsync(publicId);
+                if (success)
+                {
+                    Snackbar.Add($"Product '{productName}' deleted successfully", Severity.Success);
+                    await LoadDataAsync();
+                }
+                else
+                {
+                    Snackbar.Add("Failed to delete product", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting product: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+

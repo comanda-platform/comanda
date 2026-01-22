@@ -1,0 +1,168 @@
+@page "/persons"
+@attribute [Authorize]
+@using Comanda.Client.Admin.Models
+
+<PageTitle>Persons - Comanda Admin</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Persons</MudText>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+}
+else
+{
+    <MudPaper Elevation="2" Class="pa-4">
+        <div class="d-flex justify-space-between align-center mb-4">
+            <MudText Typo="Typo.h6">@_persons.Count() Persons Found</MudText>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="OpenCreateDialog">
+                New Person
+            </MudButton>
+        </div>
+
+        @if (_persons.Any())
+        {
+            <MudTable Items="@_persons"
+                      Hover="true"
+                      Breakpoint="Breakpoint.Sm"
+                      Dense="false"
+                      Loading="@_isLoading"
+                      LoadingProgressColor="Color.Primary">
+                <HeaderContent>
+                    <MudTh>Person ID</MudTh>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Contacts</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Person ID">
+                        @context.PublicId
+                    </MudTd>
+                    <MudTd DataLabel="Name">
+                        <strong>@context.Name</strong>
+                    </MudTd>
+                    <MudTd DataLabel="Contacts">
+                        @if (context.Contacts.Any())
+                        {
+                            <MudStack Spacing="1">
+                                @foreach (var contact in context.Contacts.Take(2))
+                                {
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Text">
+                                        @contact.Type: @contact.Value
+                                    </MudChip>
+                                }
+                                @if (context.Contacts.Count() > 2)
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        +@(context.Contacts.Count() - 2) more
+                                    </MudText>
+                                }
+                            </MudStack>
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Secondary">No contacts</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                       Color="Color.Error"
+                                       Size="Size.Small"
+                                       OnClick="@(() => DeletePersonAsync(context.PublicId, context.Name))" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info">
+                No persons found.
+            </MudAlert>
+        }
+    </MudPaper>
+}
+
+@code {
+    [Inject] private PersonApiService PersonApiService { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+    [Inject] private IDialogService DialogService { get; set; } = default!;
+
+    private bool _isLoading = true;
+    private List<PersonResponse> _persons = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPersonsAsync();
+    }
+
+    private async Task LoadPersonsAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _persons = (await PersonApiService.GetPersonsAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading persons: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { "Title", "Create New Person" }
+        };
+
+        var dialog = await DialogService.ShowAsync<CreatePersonDialog>("Create Person", parameters);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            await LoadPersonsAsync();
+        }
+    }
+
+    private async Task DeletePersonAsync(string publicId, string personName)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Message", $"Are you sure you want to delete person '{personName}'? This action cannot be undone." },
+            { "ConfirmText", "Delete" },
+            { "CancelText", "Cancel" },
+            { "ConfirmColor", Color.Error }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete Person", parameters);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            try
+            {
+                var success = await PersonApiService.DeletePersonAsync(publicId);
+                if (success)
+                {
+                    Snackbar.Add($"Person '{personName}' deleted successfully", Severity.Success);
+                    await LoadPersonsAsync();
+                }
+                else
+                {
+                    Snackbar.Add("Failed to delete person", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting person: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}

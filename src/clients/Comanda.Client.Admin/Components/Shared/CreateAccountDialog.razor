@@ -1,0 +1,75 @@
+@using Comanda.Client.Admin.Models
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField @bind-Value="_name"
+                      Label="Name"
+                      Variant="Variant.Outlined"
+                      Required="true"
+                      Class="mb-4" />
+
+        <MudCheckBox @bind-Value="_hasCreditLine"
+                     Label="Has Credit Line"
+                     Color="Color.Primary"
+                     Class="mb-4" />
+
+        @if (_hasCreditLine)
+        {
+            <MudNumericField @bind-Value="_creditLimit"
+                             Label="Credit Limit (optional)"
+                             Variant="Variant.Outlined"
+                             Min="0"
+                             Format="C"
+                             Class="mb-4" />
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="CreateAsync"
+                   Disabled="@string.IsNullOrWhiteSpace(_name)">
+            Create
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private MudBlazor.IDialogReference? MudDialog { get; set; }
+    [Inject] private AccountApiService AccountApiService { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+
+    [Parameter] public string Title { get; set; } = "Create Account";
+
+    private string _name = string.Empty;
+    private bool _hasCreditLine = false;
+    private decimal? _creditLimit = null;
+
+    private void Cancel()
+    {
+        MudDialog?.Close(DialogResult.Cancel());
+    }
+
+    private async Task CreateAsync()
+    {
+        try
+        {
+            var request = new CreateAccountRequest(_name, _hasCreditLine, _creditLimit);
+            var result = await AccountApiService.CreateAccountAsync(request);
+
+            if (result != null)
+            {
+                Snackbar.Add($"Account '{_name}' created successfully", Severity.Success);
+                MudDialog?.Close(DialogResult.Ok(result));
+            }
+            else
+            {
+                Snackbar.Add("Failed to create account", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error creating account: {ex.Message}", Severity.Error);
+        }
+    }
+}

@@ -1,0 +1,298 @@
+@page "/batches"
+@attribute [Authorize]
+@using Comanda.Client.Admin.Models
+@using Comanda.Shared.Enums
+
+<PageTitle>Production Batches - Comanda Admin</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Production Batches</MudText>
+
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" sm="4">
+            <MudDatePicker @bind-Date="_filterDate"
+                           Label="Production Date"
+                           Variant="Variant.Outlined"
+                           Clearable="true" />
+        </MudItem>
+
+        <MudItem xs="12" sm="4">
+            <MudSelect T="BatchStatus?"
+                       @bind-Value="_filterStatus"
+                       Label="Status"
+                       Variant="Variant.Outlined"
+                       Clearable="true">
+                <MudSelectItem T="BatchStatus?" Value="null">All Statuses</MudSelectItem>
+                @foreach (BatchStatus status in Enum.GetValues(typeof(BatchStatus)))
+                {
+                    <MudSelectItem Value="@status">@status</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+
+        <MudItem xs="12" sm="4" Class="d-flex align-end">
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       OnClick="ApplyFiltersAsync"
+                       FullWidth="true"
+                       StartIcon="@Icons.Material.Filled.FilterList">
+                Apply Filters
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+}
+else
+{
+    <MudPaper Elevation="2" Class="pa-4">
+        <div class="d-flex justify-space-between align-center mb-4">
+            <MudText Typo="Typo.h6">@_filteredBatches.Count() Batches Found</MudText>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       Href="/batches/create">
+                Start New Batch
+            </MudButton>
+        </div>
+
+        @if (_filteredBatches.Any())
+        {
+            <MudTable Items="@_filteredBatches"
+                      Hover="true"
+                      Breakpoint="Breakpoint.Sm"
+                      Dense="false"
+                      Loading="@_isLoading"
+                      LoadingProgressColor="Color.Primary">
+                <HeaderContent>
+                    <MudTh>Batch ID</MudTh>
+                    <MudTh>Product</MudTh>
+                    <MudTh>Production Date</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Started</MudTh>
+                    <MudTh>Duration</MudTh>
+                    <MudTh>Yield</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Batch ID">
+                        <MudLink Href="@($"/batches/{context.PublicId}")">
+                            @context.PublicId
+                        </MudLink>
+                    </MudTd>
+                    <MudTd DataLabel="Product">
+                        <MudLink Href="@($"/products/{context.ProductPublicId}")">
+                            @context.ProductPublicId
+                        </MudLink>
+                    </MudTd>
+                    <MudTd DataLabel="Production Date">
+                        @context.ProductionDate.ToString("yyyy-MM-dd")
+                    </MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip T="string" Size="Size.Small" Color="@GetStatusColor(context.Status)">
+                            @context.Status
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Started">
+                        @context.StartedAt.ToString("g")
+                    </MudTd>
+                    <MudTd DataLabel="Duration">
+                        @if (context.CompletedAt.HasValue)
+                        {
+                            var duration = context.CompletedAt.Value - context.StartedAt;
+                            <MudText>@duration.ToString(@"hh\:mm\:ss")</MudText>
+                        }
+                        else
+                        {
+                            var elapsed = DateTime.UtcNow - context.StartedAt;
+                            <MudText Color="Color.Info">@elapsed.ToString(@"hh\:mm\:ss") (ongoing)</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Yield">
+                        @if (context.Yield.HasValue)
+                        {
+                            <strong>@context.Yield portions</strong>
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Secondary">Not set</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small">
+                            <MudMenuItem Icon="@Icons.Material.Filled.Visibility"
+                                         Href="@($"/batches/{context.PublicId}")">
+                                View Details
+                            </MudMenuItem>
+                            @if (context.Status == BatchStatus.InProgress)
+                            {
+                                <MudMenuItem Icon="@Icons.Material.Filled.Done"
+                                             OnClick="@(() => OpenCompleteBatchDialog(context))">
+                                    Complete Batch
+                                </MudMenuItem>
+                            }
+                        </MudMenu>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+                </PagerContent>
+            </MudTable>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info">
+                No production batches found matching the current filters.
+            </MudAlert>
+        }
+    </MudPaper>
+}
+
+<!-- Complete Batch Dialog -->
+<MudDialog @bind-Visible="_showCompleteBatchDialog">
+    <DialogContent>
+        @if (_selectedBatch != null)
+        {
+            <MudText Typo="Typo.h6" Class="mb-3">Complete Batch @_selectedBatch.PublicId</MudText>
+            <MudNumericField @bind-Value="_batchYield"
+                             Label="Yield (portions produced)"
+                             Variant="Variant.Outlined"
+                             Min="0"
+                             Required="true"
+                             Class="mb-3" />
+            <MudTextField @bind-Value="_batchNotes"
+                          Label="Notes (optional)"
+                          Variant="Variant.Outlined"
+                          Lines="3" />
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => _showCompleteBatchDialog = false)">Cancel</MudButton>
+        <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="CompleteBatchAsync">Complete</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Inject] private BatchApiService BatchApiService { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+
+    private bool _isLoading = true;
+    private List<ProductionBatchResponse> _allBatches = new();
+    private IEnumerable<ProductionBatchResponse> _filteredBatches = new List<ProductionBatchResponse>();
+
+    private DateTime? _filterDate;
+    private BatchStatus? _filterStatus;
+
+    private bool _showCompleteBatchDialog = false;
+    private ProductionBatchResponse? _selectedBatch;
+    private int _batchYield = 0;
+    private string _batchNotes = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadBatchesAsync();
+    }
+
+    private async Task LoadBatchesAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _allBatches = (await BatchApiService.GetBatchesAsync()).ToList();
+            ApplyFilters();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading batches: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ApplyFiltersAsync()
+    {
+        ApplyFilters();
+        await Task.CompletedTask;
+    }
+
+    private void ApplyFilters()
+    {
+        _filteredBatches = _allBatches.AsEnumerable();
+
+        if (_filterDate.HasValue)
+        {
+            var dateOnly = DateOnly.FromDateTime(_filterDate.Value);
+            _filteredBatches = _filteredBatches.Where(b => b.ProductionDate == dateOnly);
+        }
+
+        if (_filterStatus.HasValue)
+        {
+            _filteredBatches = _filteredBatches.Where(b => b.Status == _filterStatus.Value);
+        }
+
+        _filteredBatches = _filteredBatches.OrderByDescending(b => b.StartedAt).ToList();
+    }
+
+    private void OpenCompleteBatchDialog(ProductionBatchResponse batch)
+    {
+        _selectedBatch = batch;
+        _batchYield = 0;
+        _batchNotes = string.Empty;
+        _showCompleteBatchDialog = true;
+    }
+
+    private async Task CompleteBatchAsync()
+    {
+        if (_selectedBatch == null || _batchYield <= 0)
+        {
+            Snackbar.Add("Please enter a valid yield", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            var request = new CompleteBatchRequest(_batchYield, null, string.IsNullOrWhiteSpace(_batchNotes) ? null : _batchNotes);
+            var success = await BatchApiService.CompleteBatchAsync(_selectedBatch.PublicId, request);
+
+            if (success)
+            {
+                Snackbar.Add("Batch completed successfully", Severity.Success);
+                _showCompleteBatchDialog = false;
+                await LoadBatchesAsync();
+            }
+            else
+            {
+                Snackbar.Add("Failed to complete batch", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error completing batch: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private Color GetStatusColor(BatchStatus status)
+    {
+        return status switch
+        {
+            BatchStatus.InProgress => Color.Warning,
+            BatchStatus.Completed => Color.Success,
+            _ => Color.Default
+        };
+    }
+}
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,43 @@
+@{
+    var (color, icon, text) = GetBadgeInfo();
+}
+
+<MudChip T="string"
+         Color="@color"
+         Size="Size.Small"
+         Variant="Variant.Filled"
+         Icon="@icon">
+    @if (ShowCount)
+    {
+        <span>@Remaining</span>
+    }
+    else
+    {
+        <span>@text</span>
+    }
+</MudChip>
+
+@code {
+    [Parameter] public AvailabilityLevel Level { get; set; }
+    [Parameter] public int Remaining { get; set; }
+    [Parameter] public bool ShowCount { get; set; } = true;
+
+    private (Color color, string icon, string text) GetBadgeInfo()
+    {
+        return Level switch
+        {
+            AvailabilityLevel.Good => (Color.Success, Icons.Material.Filled.CheckCircle, "Available"),
+            AvailabilityLevel.Low => (Color.Warning, Icons.Material.Filled.Warning, "Low"),
+            AvailabilityLevel.Critical => (Color.Error, Icons.Material.Filled.Error, "Critical"),
+            AvailabilityLevel.SoldOut => (Color.Dark, Icons.Material.Filled.Block, "Sold Out"),
+            _ => (Color.Default, Icons.Material.Filled.Help, "Unknown")
+        };
+    }
+}
+
+
+
+
+
+
+

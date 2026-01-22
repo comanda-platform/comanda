@@ -1,0 +1,309 @@
+@page "/expenses"
+@attribute [Authorize]
+@using Comanda.Client.Admin.Models
+@using Comanda.Shared.Enums
+
+<PageTitle>Expenses - Comanda Admin</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Expenses</MudText>
+
+<MudPaper Elevation="2" Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" sm="4">
+            <MudSelect T="ExpenseType?"
+                       @bind-Value="_filterType"
+                       Label="Expense Type"
+                       Variant="Variant.Outlined"
+                       Clearable="true">
+                <MudSelectItem T="ExpenseType?" Value="null">All Types</MudSelectItem>
+                @foreach (ExpenseType type in Enum.GetValues(typeof(ExpenseType)))
+                {
+                    <MudSelectItem Value="@type">@type</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+
+        <MudItem xs="12" sm="4">
+            <MudCheckBox @bind-Value="_filterActiveOnly" Label="Active Only" Color="Color.Primary" />
+        </MudItem>
+
+        <MudItem xs="12" sm="4" Class="d-flex align-end">
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       OnClick="ApplyFiltersAsync"
+                       FullWidth="true"
+                       StartIcon="@Icons.Material.Filled.FilterList">
+                Apply Filters
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_isLoading)
+{
+    <MudProgressLinear Color="Color.Primary" Indeterminate="true" Class="my-4" />
+}
+else
+{
+    <MudPaper Elevation="2" Class="pa-4 mb-4">
+        <div class="d-flex justify-space-between align-center">
+            <div>
+                <MudText Typo="Typo.h6">Summary</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Total Active Monthly Expenses: <strong>@_totalMonthlyExpenses.ToString("C")</strong>
+                </MudText>
+            </div>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       Href="/expenses/create">
+                New Expense
+            </MudButton>
+        </div>
+    </MudPaper>
+
+    <MudPaper Elevation="2" Class="pa-4">
+        <MudText Typo="Typo.h6" Class="mb-4">@_filteredExpenses.Count() Expenses Found</MudText>
+
+        @if (_filteredExpenses.Any())
+        {
+            <MudTable Items="@_filteredExpenses"
+                      Hover="true"
+                      Breakpoint="Breakpoint.Sm"
+                      Dense="false"
+                      Loading="@_isLoading"
+                      LoadingProgressColor="Color.Primary">
+                <HeaderContent>
+                    <MudTh>Description</MudTh>
+                    <MudTh>Type</MudTh>
+                    <MudTh>Amount</MudTh>
+                    <MudTh>Frequency</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Effective From</MudTh>
+                    <MudTh>Effective To</MudTh>
+                    <MudTh>Actions</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Description">
+                        <strong>@context.Description</strong>
+                    </MudTd>
+                    <MudTd DataLabel="Type">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary">
+                            @context.Type
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Amount">
+                        <MudText Typo="Typo.body1" Color="Color.Error">
+                            <strong>@context.Amount.ToString("C")</strong>
+                        </MudText>
+                        @if (context.CalculateDailyRate && context.DaysWorkedPerWeek.HasValue)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                Daily: @context.GetDailyRate().ToString("C")
+                            </MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Frequency">
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@context.Frequency</MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip T="string" Size="Size.Small"
+                                 Color="@(context.IsActive() ? Color.Success : Color.Default)">
+                            @(context.IsActive() ? "Active" : "Ended")
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Effective From">
+                        @context.EffectiveFrom.ToString("yyyy-MM-dd")
+                    </MudTd>
+                    <MudTd DataLabel="Effective To">
+                        @if (context.EffectiveTo.HasValue)
+                        {
+                            @context.EffectiveTo.Value.ToString("yyyy-MM-dd")
+                        }
+                        else
+                        {
+                            <MudText Color="Color.Secondary">Ongoing</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Actions">
+                        <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small">
+                            <MudMenuItem Icon="@Icons.Material.Filled.Edit"
+                                         Href="@($"/expenses/{context.PublicId}/edit")">
+                                Edit Expense
+                            </MudMenuItem>
+                            @if (context.IsActive())
+                            {
+                                <MudMenuItem Icon="@Icons.Material.Filled.Stop"
+                                             OnClick="@(() => EndExpenseAsync(context.PublicId, context.Description))">
+                                    End Expense
+                                </MudMenuItem>
+                            }
+                            <MudMenuItem Icon="@Icons.Material.Filled.Delete"
+                                         OnClick="@(() => DeleteExpenseAsync(context.PublicId, context.Description))">
+                                Delete Expense
+                            </MudMenuItem>
+                        </MudMenu>
+                    </MudTd>
+                </RowTemplate>
+                <PagerContent>
+                    <MudTablePager PageSizeOptions="new int[] { 10, 25, 50, 100 }" />
+                </PagerContent>
+            </MudTable>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info">
+                No expenses found matching the current filters.
+            </MudAlert>
+        }
+    </MudPaper>
+}
+
+@code {
+    [Inject] private ExpenseApiService ExpenseApiService { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+    [Inject] private IDialogService DialogService { get; set; } = default!;
+
+    private bool _isLoading = true;
+    private List<ExpenseResponse> _allExpenses = new();
+    private IEnumerable<ExpenseResponse> _filteredExpenses = new List<ExpenseResponse>();
+    private decimal _totalMonthlyExpenses = 0;
+
+    private ExpenseType? _filterType;
+    private bool _filterActiveOnly = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadExpensesAsync();
+    }
+
+    private async Task LoadExpensesAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            _allExpenses = (await ExpenseApiService.GetExpensesAsync()).ToList();
+            ApplyFilters();
+            CalculateTotalMonthlyExpenses();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading expenses: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task ApplyFiltersAsync()
+    {
+        ApplyFilters();
+        CalculateTotalMonthlyExpenses();
+        await Task.CompletedTask;
+    }
+
+    private void ApplyFilters()
+    {
+        _filteredExpenses = _allExpenses.AsEnumerable();
+
+        if (_filterType.HasValue)
+        {
+            _filteredExpenses = _filteredExpenses.Where(e => e.Type == _filterType.Value);
+        }
+
+        if (_filterActiveOnly)
+        {
+            _filteredExpenses = _filteredExpenses.Where(e => e.IsActive());
+        }
+
+        _filteredExpenses = _filteredExpenses.OrderBy(e => e.Description).ToList();
+    }
+
+    private void CalculateTotalMonthlyExpenses()
+    {
+        _totalMonthlyExpenses = _allExpenses
+            .Where(e => e.IsActive() && e.Frequency == ExpenseFrequency.Monthly)
+            .Sum(e => e.Amount);
+    }
+
+    private async Task EndExpenseAsync(string publicId, string description)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Message", $"Are you sure you want to end expense '{description}'?" },
+            { "ConfirmText", "End Expense" },
+            { "CancelText", "Cancel" },
+            { "ConfirmColor", Color.Warning }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("End Expense", parameters);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            try
+            {
+                var success = await ExpenseApiService.EndExpenseAsync(publicId);
+                if (success)
+                {
+                    Snackbar.Add($"Expense '{description}' ended successfully", Severity.Success);
+                    await LoadExpensesAsync();
+                }
+                else
+                {
+                    Snackbar.Add("Failed to end expense", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error ending expense: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+
+    private async Task DeleteExpenseAsync(string publicId, string description)
+    {
+        var parameters = new DialogParameters
+        {
+            { "Message", $"Are you sure you want to delete expense '{description}'? This action cannot be undone." },
+            { "ConfirmText", "Delete" },
+            { "CancelText", "Cancel" },
+            { "ConfirmColor", Color.Error }
+        };
+
+        var dialog = await DialogService.ShowAsync<ConfirmDialog>("Delete Expense", parameters);
+        var result = await dialog.Result;
+
+        if (result != null && !result.Canceled)
+        {
+            try
+            {
+                var success = await ExpenseApiService.DeleteExpenseAsync(publicId);
+                if (success)
+                {
+                    Snackbar.Add($"Expense '{description}' deleted successfully", Severity.Success);
+                    await LoadExpensesAsync();
+                }
+                else
+                {
+                    Snackbar.Add("Failed to delete expense", Severity.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Error deleting expense: {ex.Message}", Severity.Error);
+            }
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+

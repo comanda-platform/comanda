@@ -1,0 +1,145 @@
+@page "/clients/create"
+@attribute [Authorize]
+@using Comanda.Client.Admin.Models
+@using System.ComponentModel.DataAnnotations
+
+<PageTitle>Create Client - Comanda Admin</PageTitle>
+
+<div class="d-flex justify-space-between align-center mb-4">
+    <div>
+        <MudText Typo="Typo.h4">Create New Client</MudText>
+        <MudBreadcrumbs Items="_breadcrumbs" Class="mt-2"></MudBreadcrumbs>
+    </div>
+    <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ArrowBack" Href="/clients">
+        Back to Clients
+    </MudButton>
+</div>
+
+<EditForm Model="@_createModel" OnValidSubmit="HandleCreateClientAsync">
+    <DataAnnotationsValidator />
+
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-3">Client Information</MudText>
+                <MudGrid>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_createModel.Name"
+                                      For="@(() => _createModel.Name)"
+                                      Label="Client Name"
+                                      Variant="Variant.Outlined"
+                                      Required="true"
+                                      HelperText="Enter the client's full name" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_createModel.ClientGroupPublicId"
+                                      Label="Client Group ID (Optional)"
+                                      Variant="Variant.Outlined"
+                                      Placeholder="Enter client group public ID"
+                                      HelperText="Leave blank if not assigning to a group" />
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudPaper Elevation="2" Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-3">Actions</MudText>
+                <MudStack Spacing="2">
+                    <MudButton ButtonType="ButtonType.Submit"
+                               Variant="Variant.Filled"
+                               Color="Color.Success"
+                               FullWidth="true"
+                               StartIcon="@Icons.Material.Filled.Save"
+                               Disabled="@_isSubmitting">
+                        @if (_isSubmitting)
+                        {
+                            <MudProgressCircular Class="ms-n1" Size="Size.Small" Indeterminate="true" />
+                            <span class="ms-2">Creating...</span>
+                        }
+                        else
+                        {
+                            <span>Create Client</span>
+                        }
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Default"
+                               FullWidth="true"
+                               StartIcon="@Icons.Material.Filled.Cancel"
+                               Href="/clients"
+                               Disabled="@_isSubmitting">
+                        Cancel
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</EditForm>
+
+@code {
+    [Inject] private ClientApiService ClientApiService { get; set; } = default!;
+    [Inject] private ISnackbar Snackbar { get; set; } = default!;
+    [Inject] private NavigationManager NavigationManager { get; set; } = default!;
+
+    private CreateClientModel _createModel = new();
+    private bool _isSubmitting = false;
+
+    private List<BreadcrumbItem> _breadcrumbs = new()
+    {
+        new BreadcrumbItem("Home", href: "/"),
+        new BreadcrumbItem("Clients", href: "/clients"),
+        new BreadcrumbItem("Create", href: null, disabled: true)
+    };
+
+    private async Task HandleCreateClientAsync()
+    {
+        _isSubmitting = true;
+        try
+        {
+            var request = new CreateClientRequest(
+                _createModel.Name,
+                string.IsNullOrWhiteSpace(_createModel.ClientGroupPublicId) ? null : _createModel.ClientGroupPublicId
+            );
+
+            var createdClient = await ClientApiService.CreateClientAsync(request);
+
+            if (createdClient != null)
+            {
+                Snackbar.Add($"Client '{createdClient.Name}' created successfully", Severity.Success);
+                NavigationManager.NavigateTo($"/clients/{createdClient.PublicId}");
+            }
+            else
+            {
+                Snackbar.Add("Failed to create client", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error creating client: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private class CreateClientModel
+    {
+        [Required(ErrorMessage = "Client name is required")]
+        [StringLength(200, ErrorMessage = "Client name must be less than 200 characters")]
+        public string Name { get; set; } = string.Empty;
+
+        public string? ClientGroupPublicId { get; set; }
+    }
+}
+
+
+
+
+
+
+
+
+
+

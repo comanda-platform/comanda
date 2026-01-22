@@ -1,0 +1,57 @@
+@implements IDisposable
+
+<MudText Typo="@Typo" Color="@GetColor()">
+    @GetElapsedText()
+</MudText>
+
+@code {
+    [Parameter, EditorRequired] public DateTime StartTime { get; set; }
+    [Parameter] public Typo Typo { get; set; } = Typo.body2;
+    [Parameter] public int WarningMinutes { get; set; } = 10;
+    [Parameter] public int CriticalMinutes { get; set; } = 20;
+
+    private Timer? _timer;
+    private TimeSpan _elapsed;
+
+    protected override void OnInitialized()
+    {
+        _timer = new Timer(_ =>
+        {
+            _elapsed = DateTime.Now - StartTime;
+            InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
+    }
+
+    private string GetElapsedText()
+    {
+        if (_elapsed.TotalHours >= 1)
+        {
+            return $"{(int)_elapsed.TotalHours}h {_elapsed.Minutes:D2}m";
+        }
+
+        return $"{_elapsed.Minutes}:{_elapsed.Seconds:D2}";
+    }
+
+    private Color GetColor()
+    {
+        if (_elapsed.TotalMinutes >= CriticalMinutes)
+            return Color.Error;
+
+        if (_elapsed.TotalMinutes >= WarningMinutes)
+            return Color.Warning;
+
+        return Color.Default;
+    }
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+    }
+}
+
+
+
+
+
+
+
