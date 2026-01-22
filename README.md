@@ -5,7 +5,9 @@
 
 ---
 
-> **Comanda** is Spanish for order slip — the simple piece of paper that connects the kitchen, the delivery runner, and the person taking orders or payment. This project is named Comanda because it focuses on that exact flow: capturing orders clearly, tracking them reliably, and coordinating everyone involved, from call-in order to delivery.
+> **Comanda** is Spanish for order slip — the simple but crucial piece of paper that connects the kitchen, the delivery runner, and the person taking orders or payment.
+>
+> This project is named **Comanda** because it focuses on that exact flow: capturing orders clearly, tracking them reliably, and coordinating everyone involved, from call-in order to delivery.
 
 ---
 
